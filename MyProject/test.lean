@@ -13,6 +13,8 @@ This works because we know that the original call sequence makes everyone an exp
 -/
 
 
+
+
 -- Generates an initial state for n agents
 def generateState (n : Nat) : (List (List Nat)) :=
   (List.range (n)).map (fun x => [x])
@@ -20,7 +22,8 @@ def generateState (n : Nat) : (List (List Nat)) :=
 -- Checks if everyone is an expert
 def checkIfEE (s : (List (List Nat))) : Bool :=
   let outerLen := s.length
-  s.all (fun inner => inner.length = outerLen)
+  s.all (fun innerList => innerList.length = outerLen && innerList = List.range outerLen)
+
 
 -- Update set index idx of lst to newVal
 def updateAtIndex (lst : List (List Nat)) (idx : Nat) (newVal : List Nat) : List (List Nat) :=
@@ -36,16 +39,28 @@ def performCall (s : List (List Nat)) (caller callee : Nat) : List (List Nat) :=
   | _, _ => s
 
 
+
+
+
+-- Determines if a knows b's secret
+def knowsSecret (a : Nat) (b : Nat) (s : List (List Nat)) : Bool :=
+  (s.get! a).contains b
+
+
 -- Performs multiple calls
 def applyCalls (s : List (List Nat)) (calls : List (Nat × Nat)) : List (List Nat) :=
   calls.foldl (fun acc call => performCall acc call.fst call.snd) s
 
 
-
-
 -- Testing
 def initialState := generateState 5
-#eval applyCalls initialState [(1, 2), (0, 1), (1,5)]
+
+#eval applyCalls initialState [(1, 2)]
+#eval applyCalls initialState [(1, 2), (0, 1)]
+#eval applyCalls initialState [(1, 2), (0, 1), (1,4)]
+
+#eval knowsSecret 3 2 (applyCalls initialState [(1, 2), (0, 1), (1,4)])
+#eval knowsSecret 4 2 (applyCalls initialState [(1, 2), (0, 1), (1,4)])
 
 def seq := [(0, 1), (2, 3), (0, 2), (1, 3)]
 
@@ -60,9 +75,22 @@ theorem calls : ∃ (seq : List (Nat × Nat)), checkIfEE (applyCalls (generateSt
 
 
 -- Proof that for n = 4 there is a seq with length 4
-lemma n_is_four : 4 ≥ 4 → ∃ (seq : List (Nat × Nat)), checkIfEE (applyCalls (generateState 4) seq) = true :=
-  by intro _
-     exists [(0, 1), (2, 3), (0, 2), (1, 3)]
+lemma n_is_four : 4 ≥ 4 → ∃ (seq : List (Nat × Nat)), checkIfEE (applyCalls (generateState 4) seq) = true := by
+     intro _
+     exact Exists.intro [(0, 1), (2, 3), (0, 2), (1, 3)] (of_decide_eq_true (Eq.refl true))
+
+
+
+-- -- Function that takes the proof for n and extends it to n + 1
+-- def extendProof (n : Nat) (h : n ≥ 4) (seq : List (Nat × Nat)) (hseq : checkIfEE (applyCalls (generateState n) seq) = true): ∃ (seq' : List (Nat × Nat)), checkIfEE (applyCalls (generateState (n + 1)) seq') = true :=
+--   let seq' := [(0, n + 1)] ++ seq ++ [(0, n + 1)]
+--   -- proof that checkIfEE (applyCalls (generateState (n + 1)) seq') = true
+--   by
+
+-- Lemma that says we can inductively do another step
+lemma inductiveStep : ∀ (n : Nat), n ≥ 4 → ∃ (seq : List (Nat × Nat)), checkIfEE (applyCalls (generateState n) seq) = true → ∃ (seq' : List (Nat × Nat)), checkIfEE (applyCalls (generateState (n + 1)) seq') = true :=
+  sorry
+
 
 -- induction for n > 3, base case n = 4
 theorem expertSequenceWorks (n : Nat) : (n ≥ 4) → ∃ (seq : List (Nat × Nat)), checkIfEE (applyCalls (generateState n) seq) = true :=
@@ -71,5 +99,12 @@ theorem expertSequenceWorks (n : Nat) : (n ≥ 4) → ∃ (seq : List (Nat × Na
   | 1 => fun h => sorry
   | 2 => fun h => sorry
   | 3 => fun h => sorry
-  | 4 => by exact n_is_four
-  | (m + 1) => fun h => sorry
+  | (m + 4) =>  by
+                intro h
+                induction m
+                case zero =>
+                  exists [(0, 1), (2, 3), (0, 2), (1, 3)]
+                case succ k IH =>
+                  simp? at IH
+                  rcases IH with ⟨ seq, statement ⟩
+                  use [(0, k+1)] ++ seq ++ [(0, k+1)]
