@@ -109,6 +109,13 @@ lemma knowledge_persists_call_after (n : ℕ) (σ : List (Call n)) (i j k l: Fin
       rw [if_neg h_eq2]
       exact h
 
+-- After some arbitrary call sequence, the same information is still available.
+lemma knowledge_persists_calls_after (n : ℕ) (σ τ : List (Call n)) (i j k l: Fin n) :
+  (makeCall (generateState n) (k, l) i j) →
+  (makeCalls (makeCall (generateState n) (k, l)) τ) i j := by
+  sorry
+
+
 -- Before some arbitrary call, the same information is still available.
 lemma knowledge_persists_call_before (n : ℕ) (σ : List (Call n)) (i j k l: Fin n) :
   (makeCalls (generateState n) σ i j) →
@@ -124,7 +131,7 @@ lemma knowledge_persists_call_before (n : ℕ) (σ : List (Call n)) (i j k l: Fi
   unfold makeCall
   unfold List.foldl at h
   unfold List.foldl
-
+  sorry
 
 
 
