@@ -487,9 +487,9 @@ lemma inductive_case : ∀ (k : Nat), (Nat.succ k + 4 ≥ 4) → (∃ seq, check
   exact h_new5
 
 
-lemma inductive_case' (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : (List (Call (k + 4)))):
-    checkIfEE (makeCalls (initialState (k + 4)) seq)
-  → ∃ seq', checkIfEE (makeCalls (initialState (Nat.succ k + 4)) seq') := by
+lemma inductive_case' (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 4))):
+    checkIfEE (makeCalls (initialState (k + 4)) seq) →
+    ∃ seq', checkIfEE (makeCalls (initialState (Nat.succ k + 4)) seq') ∧ seq'.length = 2 + seq.length := by
   intro IH
   let expandedSeq := expandCalls seq
   let zero_fin : Fin (Nat.succ (k + 4)) := 0
@@ -631,7 +631,7 @@ lemma inductive_case' (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : (List (Call (k 
   exact h_new5
 
 -- induction for n > 3, base case n = 4
-theorem expertSequenceWorks (n : Nat) : (n ≥ 4) → ∃ (seq : List (Call n)), checkIfEE (makeCalls (initialState n) seq) :=
+theorem expertSequenceWorks (n : Nat) : (n ≥ 4) → ∃ (seq : List (Call n)), seq.length = (2 * n - 4) ∧ checkIfEE (makeCalls (initialState n) seq) :=
   match n with
   | 0 => by simp
   | 1 => by simp
