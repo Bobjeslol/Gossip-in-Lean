@@ -2,6 +2,7 @@ import Mathlib.Data.List.Basic
 import Mathlib.Data.Fin.Basic
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Tactic.Linarith
+import Mathlib.Data.Bool.Basic
 
 variable {n : ℕ}
 
@@ -9,9 +10,9 @@ def GossipState (n : Nat) : Type := Fin n → Fin n → Prop
 
 def Call (n : Nat): Type := Fin n × Fin n
 
-def generateState (n : Nat) : GossipState n := fun i j => i = j
+def initialState (n : Nat) : GossipState n := fun i j => i = j
 
-instance {n : ℕ} : DecidableRel (generateState n) := decEq
+instance {n : ℕ} : DecidableRel (initialState n) := decEq
 
 -- Determines if someone is an expert
 -- a is agent, n is the total number of secrets
@@ -25,6 +26,7 @@ def checkIfEE (s : GossipState n) : Prop := ∀ i, isExpert s i
 
 instance {s : GossipState n} [DecidableRel s] : Decidable (checkIfEE s) :=
   Fintype.decidableForallFintype
+
 
 def makeCall (s : GossipState n) : Call n → GossipState n
   | (i, j), x, y =>
@@ -54,9 +56,16 @@ instance {s : GossipState n} [DecidableRel s] {cs : List (Call n)} :
   case nil hs => exact hs
   case cons c _ ih hs => exact ih
 
+instance : Repr (GossipState n) := Repr.mk $
+  λ (s : GossipState n) _ =>
+    let whatIknows (i : Fin n) := (i, (Fin.list n).filter (λ j => false)) -- how on earth do i make (s i j) decidable?
+    repr ((Fin.list n).map whatIknows)
+
+#eval repr (initialState 4)
+
 def everyoneExpert (s : GossipState n) : Prop := ∀ a b : Fin n, s a b
 
--- Prop: s2 contains equal or more gossip to s1
+-- Prop: s2 contains equal or more gossip than s1
 def moreGossip (s1 s2 : GossipState n) : Prop := ∀ a b : Fin n, (s1 a b) → (s2 a b)
 
 -- Adds an agent to a state, that knows only their own secret
@@ -75,13 +84,17 @@ def expandCall {n : ℕ} (c : Call n) : Call (Nat.succ n) :=
 def expandCalls {n : ℕ} (cs : List (Call n)) : List (Call (Nat.succ n)) :=
   cs.map expandCall
 
+def containsAdjusted {n : Nat} (σ : List (Call n)) (c : Fin (n + 1) × Fin (n + 1)) : Bool :=
+  σ.any (match c with
+          | (i, j) => λ c => (c.1 = i ∧ c.2 = j) ∨ (c.1 = j ∧ c.2 = i))
+
 def stateEquivalence : GossipState n → GossipState n → Prop :=
   λ s1 s2 => ∀ a b, s1 a b ↔ s2 a b
 
 
--- lemma after call (a, b) agent a knows b's secret if the gossipstate was generated with generateState
-lemma makeCall_shares_secrets : (makeCall (generateState n) (a, b)) a b := by
-  simp [makeCall, generateState]
+-- lemma after call (a, b) agent a knows b's secret if the gossipstate was generated with initialState
+lemma makeCall_shares_secrets : (makeCall (initialState n) (a, b)) a b := by
+  simp [makeCall, initialState]
 
 -- calling an expert makes you an expert
 lemma expert_makes_expert {s : GossipState n} {i j : Fin n} :
@@ -196,11 +209,11 @@ lemma makeCalls_increases_gossip (s1 s2 : GossipState n) (cs : List (Call n)) :
 -- Before some arbitrary call, the same information is still available.
 lemma knowledge_persists_call_before (n : ℕ) (σ : List (Call n))
 (i j k l: Fin n) :
-  (makeCalls (generateState n) σ i j) →
-  (makeCalls (makeCall (generateState n) (k, l)) σ) i j := by
+  (makeCalls (initialState n) σ i j) →
+  (makeCalls (makeCall (initialState n) (k, l)) σ) i j := by
   intro h
   apply makeCalls_increases_gossip
-  exact makeCall_makes_gossip (generateState n) (k, l)
+  exact makeCall_makes_gossip (initialState n) (k, l)
   exact h
 
 -- After some arbitrary call, the same information is still available.
@@ -222,11 +235,18 @@ lemma knowledge_persists_call_after (n : ℕ) (i j k l: Fin n)
         rw [if_neg h_eq2]
         exact h
 
+-- If two states are equal and they both contain a call at the start, then the states without the call are equal
+lemma makeCall_same_state (s1 s2 : GossipState n) (c : Call n) :
+  stateEquivalence (makeCall s1 c) (makeCall s2 c) → stateEquivalence s1 s2 := by
+  sorry
+
+
+
 -- After some arbitrary call sequence, the same information is still available.
 -- UNFINISHED/ USED!!!
 lemma knowledge_persists_calls_after (n : ℕ) (σ : List (Call n)) (i j k l: Fin n) :
-  (makeCall (generateState n) (k, l) i j) →
-  (makeCalls (makeCall (generateState n) (k, l)) σ) i j := by
+  (makeCall (initialState n) (k, l) i j) →
+  (makeCalls (makeCall (initialState n) (k, l)) σ) i j := by
   simp [makeCalls]
   intro h'
   sorry
@@ -234,8 +254,8 @@ lemma knowledge_persists_calls_after (n : ℕ) (σ : List (Call n)) (i j k l: Fi
 -- Shows that secrets are not lost if calls are added before or after.
 -- UNUSED/UNFINISHED
 lemma knowledge_persistence {n : ℕ} (σ τ : List (Call n)) (i j : Fin n) :
-  (makeCalls (generateState n) σ i j) →
-  (makeCalls (generateState n) (τ ++ σ) i j) ∧ (makeCalls (generateState n) (σ ++ τ) i j) := by
+  (makeCalls (initialState n) σ i j) →
+  (makeCalls (initialState n) (τ ++ σ) i j) ∧ (makeCalls (initialState n) (σ ++ τ) i j) := by
   intro h
   induction τ
   case nil =>
@@ -282,13 +302,13 @@ lemma addAgent_expert_old {s : GossipState n} {i : Fin n} :
   exact Iff.intro h1 h2
 
 
--- We can replace addAgent with generateState (n + 1) in the following lemma n ≥ 4
+-- We can replace addAgent with initialState (n + 1) in the following lemma n ≥ 4
 lemma addAgent_equals_succ {n : ℕ} :
-  addAgent (generateState n) = (generateState (Nat.succ n)) := by
+  addAgent (initialState n) = (initialState (Nat.succ n)) := by
   induction n
   case zero =>
-    simp [addAgent, generateState]
-    unfold generateState
+    simp [addAgent, initialState]
+    unfold initialState
     unfold addAgent
     simp
     unfold Fin.last
@@ -317,7 +337,7 @@ lemma addAgent_equals_succ {n : ℕ} :
   case succ k ih =>
     unfold addAgent
     simp [ih]
-    unfold generateState
+    unfold initialState
     funext i
     cases i
     simp_all only [Fin.castSucc, Fin.last]
@@ -343,19 +363,74 @@ lemma addAgent_equals_succ {n : ℕ} :
           subst a
           simp_all only [not_false_eq_true, and_self]
 
--- addAgent (generateState n) is replacable with generateState (n + 1)
-lemma makeCalls_addAgent_generateState_equiv {n : Nat} (initial_call : Call (n + 1)) (expandedSeq : List (Call (n + 1))) :
-  makeCall (makeCalls (makeCall (addAgent (generateState n)) initial_call) expandedSeq) initial_call =
-  makeCalls (generateState (n + 1)) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
+-- addAgent (initialState n) is replacable with initialState (n + 1)
+lemma makeCalls_addAgent_initialState_equiv {n : Nat} (initial_call : Call (n + 1)) (expandedSeq : List (Call (n + 1))) :
+  makeCall (makeCalls (makeCall (addAgent (initialState n)) initial_call) expandedSeq) initial_call =
+  makeCalls (initialState (n + 1)) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
   rw [← makeCalls_cons]
   rw [addAgent_equals_succ]
   rw [makeCalls_snoc]
   simp_all only [List.singleton_append]
 
 
+-- Adding an agent before a call is equivalent to adding an agent after the call if the call doesn't involve the new agent
+lemma addAgent_equiv_call {n : Nat} (c : Call n) (i : Fin n) :
+  (c.1 ≠ i) ∧ (c.2 ≠ i) → makeCall (addAgent (initialState n)) (expandCall c) = addAgent (makeCall (initialState n) c) := by
+  intro h
+  cases h
+  simp [expandCall, addAgent, initialState]
+  simp_all only [ne_eq, not_false_eq_true]
+  cases c
+  rename_i a b
+  unfold makeCall
+  simp
+  unfold initialState
+  unfold addAgent
+  simp
+  apply funext
+  aesop?
+  · simp [Fin.lastCases]
+    simp [Fin.reverseInduction]
+    aesop?
+  · simp [Fin.lastCases]
+    simp [Fin.reverseInduction]
+    aesop?
+  · simp [Fin.lastCases]
+    simp [Fin.reverseInduction]
+    aesop?
+
+
+-- Expandcalls is equivalent to expandCall head ++ expandCalls tail
+lemma expandCalls_equiv_expandCall {n : Nat} (c : Call n) (cs : List (Call n)) :
+  expandCalls (c :: cs) = expandCall c :: expandCalls cs := by
+  rfl
+
+
+-- Adding an agent at the end is equivalent to adding an agent at the start if the sequence doesn't contain calls to the new agent
+lemma addAgent_equiv_calls {n : Nat} (σ : List (Call n)) (i : Fin n) :
+  (¬ containsAdjusted σ (i, Fin.last n)) ∧ (¬ containsAdjusted σ (Fin.last n, i)) →
+  stateEquivalence (makeCalls (addAgent (initialState n)) (expandCalls σ)) (addAgent (makeCalls (initialState n) σ)) := by
+  induction σ
+  case nil =>
+    intro h
+    simp [stateEquivalence]
+    intro a b
+    aesop?
+  case cons =>
+    -- use addAgent_equiv_call
+    intro h'
+    rw [expandCalls_equiv_expandCall]
+    rw [makeCalls_cons]
+    rw [addAgent_equiv_call]
+    rename_i head tail ih
+    rw [makeCalls_cons]
+    sorry
+    sorry
+    sorry
+
 --Unused, kept for reference
-lemma inductive_case : ∀ (k : Nat), (Nat.succ k + 4 ≥ 4) → (∃ seq, checkIfEE (makeCalls (generateState (k + 4)) seq))
-  → ∃ seq', checkIfEE (makeCalls (generateState (Nat.succ k + 4)) seq') := by
+lemma inductive_case : ∀ (k : Nat), (Nat.succ k + 4 ≥ 4) → (∃ seq, checkIfEE (makeCalls (initialState (k + 4)) seq))
+  → ∃ seq', checkIfEE (makeCalls (initialState (Nat.succ k + 4)) seq') := by
   intro n h IH
   cases IH
   rename_i seq IH
@@ -363,19 +438,19 @@ lemma inductive_case : ∀ (k : Nat), (Nat.succ k + 4 ≥ 4) → (∃ seq, check
   let zero_fin : Fin (Nat.succ n + 4) := Fin.ofNat 0
   let succ_fin : Fin (Nat.succ n + 4) := Fin.last (n + 4) -- Maybe nat.succ on n? i think this works though
   let initial_call : Call (Nat.succ n + 4)  := (zero_fin, succ_fin)
-  let new_state := makeCall (makeCalls (makeCall (addAgent (generateState (n + 4))) initial_call) expandedSeq) initial_call
+  let new_state := makeCall (makeCalls (makeCall (addAgent (initialState (n + 4))) initial_call) expandedSeq) initial_call
 
 
-  -- Need lemma to show addAgent (generateState (n + 4)) is equal to generateState (n + 4 + 1)
+  -- Need lemma to show addAgent (initialState (n + 4)) is equal to initialState (n + 4 + 1)
   -- First new_state into a single sequence of calls that only needs one makeCalls application
-  have single_calls : new_state = makeCalls (generateState (Nat.succ n + 4)) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
+  have single_calls : new_state = makeCalls (initialState (Nat.succ n + 4)) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
     sorry
 
   -- in new_state, the first agent knows the secret of the new agent due to the initial call
   have h_new : new_state zero_fin succ_fin := by
     simp [new_state]
     left
-    apply makeCalls_increases_gossip (addAgent (generateState (n + 4))) (makeCall (addAgent (generateState (n + 4))) initial_call)
+    apply makeCalls_increases_gossip (addAgent (initialState (n + 4))) (makeCall (addAgent (initialState (n + 4))) initial_call)
     sorry
 
   -- in new_state, the first n agents know all secrets of the first n agents using the original seq
@@ -412,39 +487,57 @@ lemma inductive_case : ∀ (k : Nat), (Nat.succ k + 4 ≥ 4) → (∃ seq, check
   exact h_new5
 
 
-lemma inductive_case' (k : Nat) (h: k ≥ 4) (seq : (List (Call k))):
-    checkIfEE (makeCalls (generateState k) seq)
-  → ∃ seq', checkIfEE (makeCalls (generateState (k + 1)) seq') := by
+lemma inductive_case' (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : (List (Call (k + 4)))):
+    checkIfEE (makeCalls (initialState (k + 4)) seq)
+  → ∃ seq', checkIfEE (makeCalls (initialState (Nat.succ k + 4)) seq') := by
   intro IH
   let expandedSeq := expandCalls seq
-  let zero_fin : Fin (Nat.succ k) := 0
-  let succ_fin : Fin (Nat.succ k) := Fin.last (k)
-  let initial_call : Call (Nat.succ k) := (zero_fin, succ_fin)
-  let attempt := makeCall (addAgent (generateState (k))) initial_call
-  let new_state := makeCall (makeCalls (makeCall (addAgent (generateState (k))) initial_call) expandedSeq) initial_call
+  let zero_fin : Fin (Nat.succ (k + 4)) := 0
+  let succ_fin : Fin (Nat.succ (k + 4)) := Fin.last (k + 4)
+  let initial_call : Call (Nat.succ (k + 4)) := (zero_fin, succ_fin)
+  let attempt := makeCall (addAgent (initialState (k + 4))) initial_call
+  let new_state := makeCall (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) expandedSeq) initial_call
 
-  have single_calls : new_state = makeCalls (generateState (Nat.succ k)) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
+  have single_calls : new_state = makeCalls (initialState (Nat.succ (k + 4))) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
     simp [new_state]
-    apply makeCalls_addAgent_generateState_equiv
+    apply makeCalls_addAgent_initialState_equiv
 
     -- in new_state, the first agent knows all secrets of the first n agents using the original seq
   have h_new1 : ∀ i, i ≠ succ_fin → new_state zero_fin i := by
-    -- use addAgent_expert_old
+  -- use addAgent_expert_old
     unfold checkIfEE at IH
 
-    have h : ∀ i, i ≠ succ_fin → makeCalls (addAgent (generateState k)) expandedSeq zero_fin i := by
+    have h : ∀ i, i ≠ succ_fin → makeCalls (addAgent (initialState (k + 4))) expandedSeq zero_fin i := by
       simp_all only [expandedSeq, isExpert]
-      let zero_fin_old (h : 4 ≤ k) : (Fin k) := ⟨0, by linarith⟩
-      have statement := IH (zero_fin_old h)
-      have h' : isExpert (makeCalls (generateState k) seq) (zero_fin_old h) := by
+      let zero_fin_old := 0
+      have statement := IH (zero_fin_old)
+      have h' : isExpert (makeCalls (initialState (k + 4)) seq) zero_fin_old := by
         simp_all only [new_state, succ_fin, expandedSeq]
         apply IH
+
       rw [addAgent_expert_old] at h'
+      simp [succ_fin]
+
+      have test := addAgent_equiv_calls seq (k + 4) (?_) -- look at this goal first
+      simp [stateEquivalence] at test
+      apply Fin.lastCases
+      · sorry
+      · sorry
+
+      -- simp_all only [addAgent, initialState]
+      -- intro i
+      -- cases i
+      -- rename_i val isLt
+      -- let i_rebuilt : Fin (Nat.succ (k + 4)) := ⟨val, isLt⟩
+      -- by_cases (i_rebuilt = succ_fin)
+      -- simp_all only [new_state, initial_call, zero_fin, succ_fin, expandedSeq, i_rebuilt]
+      -- · aesop?
+      -- · rename_i ll
+      --   sorry
       -- ????
-      sorry
 
     -- new_state is stronger
-    have h' : moreGossip (makeCalls (addAgent (generateState k)) expandedSeq) new_state := by
+    have h' : moreGossip (makeCalls (addAgent (initialState (k + 4))) expandedSeq) new_state := by
       simp [new_state]
       sorry
 
@@ -464,31 +557,29 @@ lemma inductive_case' (k : Nat) (h: k ≥ 4) (seq : (List (Call k))):
   have h_agent_expert : isExpert new_state zero_fin := by
     -- combine h_new1 and h_new2
     unfold isExpert
-    intro j
-    simp_all only [new_state, initial_call, zero_fin, succ_fin, expandedSeq]
+    simp [succ_fin] at h_new2
     sorry
 
+
+  -- Difficult
   -- Putting h_new1 and h_new2 together, we get that all but the last agents are experts
   have h_new3 : ∀ i, i ≠ succ_fin → isExpert new_state i := by
-    unfold isExpert
-    intro i
-    cases i
-    rename_i val isLt
-    let i_rebuilt : Fin (Nat.succ k) := ⟨val, isLt⟩
-    by_cases (i_rebuilt = succ_fin)
-    simp_all only [new_state, initial_call, zero_fin, succ_fin, expandedSeq, i_rebuilt]
-    · aesop?
-    · intro h
-      simp_all only [new_state, expandedSeq]
-      intro j
+    have subgoal_1 : (initialState (Nat.succ (k + 4))) zero_fin succ_fin := by
       sorry
+
+    -- for all a, b where a != succ_fin, a knows b
+    have subgoal_2 : ∀ i, i ≠ succ_fin → ∀ j, new_state i j := by
+      sorry
+
+    simp [isExpert]
+    exact subgoal_2
 
 
 
   -- using the final call, we can show that the new agent also becomes an expert
   have h_new4 : isExpert new_state succ_fin := by
     let calls_without_final_call := [initial_call] ++ expandedSeq
-    let temp_state := makeCalls (generateState (Nat.succ k)) calls_without_final_call
+    let temp_state := makeCalls (initialState (Nat.succ (k + 4))) calls_without_final_call
 
     have h : isExpert temp_state zero_fin := by
       unfold isExpert
@@ -502,12 +593,15 @@ lemma inductive_case' (k : Nat) (h: k ≥ 4) (seq : (List (Call k))):
 
       -- zero_fin learns all secrets of the first n agents
       have h2 : ∀ i, temp_state zero_fin i := by
-        intro h'
-        simp_all only [temp_state, calls_without_final_call]
+        simp [temp_state]
+        intro i
+        simp [calls_without_final_call, makeCalls]
         apply knowledge_persists_call_before
-        simp
+
+
+        sorry -- use exact h_new1
+
         -- IH shows theyre all experts
-        sorry
 
       -- h1 and h2 combined say zero fin is an expert
       simp_all only [new_state, initial_call, temp_state, calls_without_final_call]
@@ -527,7 +621,7 @@ lemma inductive_case' (k : Nat) (h: k ≥ 4) (seq : (List (Call k))):
     intro i
     cases i
     rename_i val isLt
-    let i_rebuilt : Fin (Nat.succ k) := ⟨val, isLt⟩
+    let i_rebuilt : Fin (Nat.succ (k + 4)) := ⟨val, isLt⟩
     by_cases (i_rebuilt = succ_fin);
     aesop?
     aesop?
@@ -535,10 +629,9 @@ lemma inductive_case' (k : Nat) (h: k ≥ 4) (seq : (List (Call k))):
   exists [initial_call] ++ expandedSeq ++ [initial_call]
   rw [single_calls] at h_new5
   exact h_new5
-  sorry
 
 -- induction for n > 3, base case n = 4
-theorem expertSequenceWorks (n : Nat) : (n ≥ 4) → ∃ (seq : List (Call n)), checkIfEE (makeCalls (generateState n) seq) :=
+theorem expertSequenceWorks (n : Nat) : (n ≥ 4) → ∃ (seq : List (Call n)), checkIfEE (makeCalls (initialState n) seq) :=
   match n with
   | 0 => by simp
   | 1 => by simp
