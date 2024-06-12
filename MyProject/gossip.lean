@@ -204,6 +204,23 @@ lemma makeCall_makes_gossip (s : GossipState n) (c : Call n) :
     simp_all only
     exact hyp
 
+-- used
+lemma calls_increase_gossip (s : GossipState n) (cs : List (Call n)) :
+    moreGossip s (makeCalls s cs) := by
+    induction cs generalizing s
+    case nil =>
+      simp [makeCalls]
+      unfold moreGossip
+      intro a b h
+      exact h
+    case cons c cs ih =>
+      -- use makeCall_makes_gossip
+      rw [makeCalls_cons]
+      have l : moreGossip s (makeCall s c) := by
+        apply makeCall_makes_gossip
+      simp_all [moreGossip]
+
+
 lemma makeCalls_increases_gossip (s1 s2 : GossipState n) (cs : List (Call n)) :
     moreGossip s1 s2 → moreGossip (makeCalls s1 cs) (makeCalls s2 cs) := by
     intro h
@@ -441,14 +458,12 @@ lemma addAgent_equiv_calls {n : Nat} (σ : List (Call n)) (i : Fin n) :
     intro h
     aesop?
   case cons =>
-    -- use addAgent_equiv_call
     intro h'
     rw [expandCalls_equiv_expandCall]
     rw [makeCalls_cons]
     rw [addAgent_equiv_call]
     · rename_i head tail ih
       rw [makeCalls_cons]
-
       sorry
 
     · aesop?
@@ -521,9 +536,7 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
     simp [calls_without_final_call, expandedSeq]
     rw [makeCalls_cons]
     have l : moreGossip (makeCall (addAgent (initialState (k + 4))) initial_call) (makeCalls ((makeCall (addAgent (initialState (k + 4))) initial_call)) (expandCalls seq)) := by
-      unfold moreGossip
-      intro a b
-      sorry -- this should be easy
+      apply calls_increase_gossip
     apply l
     simp [initial_call, makeCall]
     right
