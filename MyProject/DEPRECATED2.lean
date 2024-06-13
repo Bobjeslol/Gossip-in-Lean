@@ -1,13 +1,3 @@
--- fin.lean
---
--- Author:      Timo Doherty
--- Student-id:  11868910
--- Project:     Graduation Project
--- Description:
---  Formal proof of well established result that 2n-4 calls are sufficient
---  and required to end up in a state where all n agents are experts.
-
-
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Fin.Basic
 
