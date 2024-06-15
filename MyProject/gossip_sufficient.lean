@@ -540,8 +540,13 @@ lemma two_secrets_succ' {n : Nat} (s : GossipState (Nat.succ n)) (a b : Fin (Nat
   ∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s seq) i b := by
   intro i h h1 h2
   -- maybe first do this for a call.
-  aesop?
-  sorry
+  induction seq
+  case nil =>
+    simp [makeCalls]
+    sorry
+  case cons =>
+    sorry
+
 
 -- Main lemma for the induction step
 lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 4))):
@@ -663,9 +668,9 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
             simp [addAgent]
             aesop?
 
-          -- This is required, and similar, but not quite the same. How to transform?
+          -- This is required, and similar, but not quite the same. How to transform? Shouldnt be too hard
           have testttt : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ Fin.last (k + 4) → ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i ↑↑j := by
-            sorry
+            sorry -- weird type thing
 
           aesop?
 
@@ -684,35 +689,44 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
           constructor
           · apply milestone_3
           · apply milestone_3
-        have sigma_makes_all_learn_first : ∀ i, i ≠ succ_fin → temp_state i zero_fin := by
-          sorry
+
+        have seq_makes_all_learn_first : temp_state i zero_fin := by
+          simp [temp_state, calls_without_final_call, expandedSeq]
+          exact h'' zero_fin
+
         -- how do i apply two_secrets?
         -- we have the result of two secrets:
         have all_know_new_secret : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ zero_fin → makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) i succ_fin := by
           have h_known : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → ¬ (addAgent (initialState (k + 4))) i zero_fin ∧ ¬ (addAgent (initialState (k + 4))) i succ_fin := by
             sorry
+
           have h_seq : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i zero_fin := by
             sorry
+
           apply two_secrets_succ' (addAgent (initialState (k + 4))) zero_fin succ_fin (initial_call :: expandCalls seq) h_known h_seq
 
         have new_agent_knows_new_agent : temp_state succ_fin succ_fin := by
-          simp [temp_state, initialState, addAgent]
           sorry
+
         -- put all_know_new_secret together with new_agent_knows_new_agent
         sorry
+
       -- Putting them together in the right format.
       have final : ∀ (j : Fin (Nat.succ (k + 4))), temp_state i j := by
+        intro j
         -- all old agents know the new agent's secret
-        have test : temp_state (Fin.castSucc i) succ_fin := by
+        have final_secret : temp_state (Fin.castSucc i) succ_fin := by
           aesop?
 
         -- all old agents know all old secrets in the new state
-        have test1 : ∀ (j : Fin (k + 4)), temp_state i (Fin.castSucc j) := by
+        have other_secrets : ∀ (q : Fin (k + 4)), temp_state i (Fin.castSucc q) := by
           aesop?
-        simp [succ_fin] at test
+        simp [succ_fin] at final_secret
         simp_all only [ne_eq, Fin.lastCases_last, List.singleton_append, Fin.eta, not_false_eq_true, Fin.last, Fin.castSucc]
+
+        have other_secrets_cast : temp_state i j := by
+          sorry -- type thing
         aesop?
-        sorry
       aesop?
 
     simp [new_state, isExpert]
