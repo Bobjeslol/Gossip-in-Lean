@@ -22,6 +22,7 @@ import Mathlib.Data.Matrix.Notation
 
 variable {n : ℕ}
 
+
 -- State representation that contains the all gossip information between any agents.
 def GossipState (n : Nat) : Type := Fin n → Fin n → Prop
 
@@ -374,6 +375,11 @@ lemma addAgent_expert_old {s : GossipState n} {i : Fin n} :
   exact Iff.intro h1 h2
 
 
+-- Does the same for multiple agents.
+lemma addAgent_expert_olds {s : GossipState n}
+
+
+
 -- Very messy, needs to be cleaned up.
 -- We can replace addAgent with initialState (n + 1) in the following lemma n ≥ 4
 lemma addAgent_equals_succ {n : ℕ} :
@@ -502,6 +508,28 @@ lemma addAgent_equiv_calls {n : Nat} (σ : List (Call n)) (i : Fin n) :
     · sorry
 
 
+-- The call sequence contains contain agent a
+def contains (σ : List (Call n)) (a : Fin (n)) : Bool :=
+  σ.any (λ c' => c'.1 = a ∨ c'.2 = a)
+
+-- Lemma stating that a call sequence of calls Fin n x Fin n can never contain Fin.last n
+lemma cant_contain_last {n : Nat} (σ : List (Call n)) :
+  ¬ contains (expandCalls σ) (Fin.last n) := by
+  sorry
+
+
+lemma addAgent_replacable {n : Nat} (σ : List (Call n)) : stateEquivalence (makeCalls (addAgent (initialState n)) (expandCalls σ)) (addAgent (makeCalls (initialState n) σ)) := by
+    -- The old sequence doesn't contain the old agent.
+  sorry
+
+
+-- If an agent knows two secrets, then there is a call sequence which makes everyone learn the first secret then all other agents also learn the other secret.
+-- Given that the other agents dont know either of those two secrets.
+lemma two_secrets_succ {n : Nat} (s : GossipState (Nat.succ n)) (a b : Fin (Nat.succ n)) :
+  (∀ i : Fin (Nat.succ n), i ≠ a → ¬ s i a ∧ ¬ s i b) → -- Only agent a knows a and b
+  (∃ σ : List (Call (Nat.succ n)), ∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s σ) i a) → -- There exists a sequence making all agents learn secret a
+  ∃ σ : List (Call (Nat.succ n)), ∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s σ) i b := by -- Then, there exists a sequence making all agents learn secret b
+  sorry
 -- Main lemma for the induction step
 lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 4))):
     checkIfEE (makeCalls (initialState (k + 4)) seq) →
@@ -513,16 +541,18 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
   let initial_call : Call (Nat.succ (k + 4)) := (zero_fin, succ_fin)
   let attempt := makeCall (addAgent (initialState (k + 4))) initial_call
   let new_state := makeCall (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) expandedSeq) initial_call
+  let calls_without_final_call := [initial_call] ++ expandedSeq
+  let temp_state := makeCalls (addAgent (initialState (k + 4))) calls_without_final_call
 
+  -- We can rewrite new_state so it contains a single call sequence.
   have single_calls : new_state = makeCalls (initialState (Nat.succ (k + 4))) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
     simp [new_state]
     apply makeCalls_addAgent_initialState_equiv
 
-  let calls_without_final_call := [initial_call] ++ expandedSeq
-  let temp_state := makeCalls (addAgent (initialState (k + 4))) calls_without_final_call
-
+  -- The first agent knows all secrets except the new agent's secret
   have milestone_1 : ∀ i, i ≠ succ_fin → temp_state zero_fin i := by
     unfold checkIfEE at IH
+
 
     have h : ∀ i, i ≠ succ_fin → makeCalls (addAgent (initialState (k + 4))) expandedSeq zero_fin i := by
       simp_all only [expandedSeq, isExpert]
@@ -532,19 +562,16 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
         simp_all only [new_state, succ_fin, expandedSeq]
         apply IH
 
-      rw [addAgent_expert_old] at h' -- big step
+      rw [addAgent_expert_old] at h'
       simp [succ_fin]
-
-      have test := addAgent_equiv_calls seq (k + 4) (?_) -- look at this goal first
-      simp [stateEquivalence] at test
+      have replacement := addAgent_replacable seq zero_fin_old -- Still need to do the addAgent_replacable proof
+      simp [stateEquivalence] at replacement
 
       apply Fin.lastCases
       · intro a
         simp_all only [le_add_iff_nonneg_left, zero_le, Nat.cast_zero]
       · intro i a
         simp_all only [Nat.cast_zero, Fin.castSucc_zero, zero_fin_old]
-      -- how to prove the call sequence with type List (Call n) where call is fin n x fin n doesnt contain any fin.last n?
-      sorry
 
     -- New_state contains more gossip than temp_state.
     have h' : moreGossip (makeCalls (addAgent (initialState (k + 4))) expandedSeq) temp_state := by
@@ -559,7 +586,7 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
     apply h'
     simp_all only [not_false_eq_true]
 
-  -- The first agent learns the secret of the new agent as well due to the initial call
+  -- The first agent learns the secret of the new agent.
   have milestone_2 : temp_state zero_fin succ_fin := by
     simp [temp_state, calls_without_final_call, expandedSeq]
     rw [makeCalls_cons]
@@ -571,7 +598,7 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
     simp [addAgent, initialState]
     simp_all only [Fin.lastCases_last, new_state, zero_fin, succ_fin]
 
-  -- Thus the first agent is an expert
+  -- Thus the first agent is an expert.
   have milestone_3 : isExpert temp_state zero_fin := by
     unfold isExpert
     simp [succ_fin] at milestone_2
@@ -596,20 +623,93 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
     have subgoal_1 : makeCall (initialState (Nat.succ (k + 4))) initial_call zero_fin succ_fin := by
       apply makeCall_shares_secrets
 
-    -- for all a, b where a != succ_fin, a knows b
+    -- The goal is true for temp_state.
     have subgoal_2 : ∀ i, i ≠ succ_fin → ∀ j, temp_state i j := by
       intro i h
       simp [temp_state, calls_without_final_call, expandedSeq]
       simp [checkIfEE] at IH
+
+      -- All agents of the old state are experts in the old state.
       have h' : isExpert (makeCalls (initialState (k + 4)) seq) i := by
         apply IH
+
       -- Need to introduce new agent's secret.
       rw [addAgent_expert_old] at h'
-      -- This is tricky, might need a lemma that shows the polar secrets are shared identically after the initial call.
-      sorry
+
+      -- We can rewrite the addAgent one layer deeper and add the initial call without losing gossip.
+      -- All old agents know all old secrets in the new state
+      -- relatively easy
+      have h'' : ∀ (j : Fin (k + 4)), (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i (Fin.castSucc j) := by
+
+        -- Its true for this state
+        have test : ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) ↑↑i ↑↑j := by
+
+          have testtt : ∀ (i : Fin (k + 4)), ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) ↑↑i ↑↑j := by
+            intro i j
+            rw [addAgent_replacable]
+            simp [addAgent]
+            aesop?
+
+          -- This is required, and similar, but not quite the same. How to transform?
+          have testttt : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ Fin.last (k + 4) → ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i ↑↑j := by
+            sorry
+
+          aesop?
+
+        -- This state is stronger
+        have stronger_state : moreGossip (makeCalls (addAgent (initialState (k + 4))) (expandCalls seq)) (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) := by
+          apply makeCalls_increases_gossip
+          apply makeCall_makes_gossip
+
+        aesop?
+
+      -- All i learn the secret of the new agent as well.
+      -- big step.. hard -- todo today
+      have h''' : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) (Fin.castSucc ↑↑i) succ_fin := by
+        -- prepare for the lemma.
+        have agent_0_knows_both : temp_state zero_fin succ_fin ∧ temp_state zero_fin zero_fin := by
+          constructor
+          · apply milestone_3
+          · apply milestone_3
+        have sigma_makes_all_learn_first : ∀ i, i ≠ succ_fin → temp_state i zero_fin := by
+          sorry
+        -- how do i apply two_secrets?
+        -- we have the result of two secrets:
+        have all_know_new_secret :
+          ∃ σ, ∀ (i : Fin (Nat.succ (k + 4))), i ≠ zero_fin → makeCalls temp_state σ i succ_fin := by
+          simp [temp_state]
+          have h_known : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → ¬ temp_state i zero_fin ∧ ¬ temp_state i succ_fin := by
+            sorry
+          have h_seq : ∃ σ : List (Call (Nat.succ (k + 4))), ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → (makeCalls temp_state σ) i zero_fin := by
+            sorry
+          apply two_secrets_succ temp_state zero_fin succ_fin h_known h_seq
+
+          -- apply two_secrets temp_state zero_fin (initial_call :: expandCalls seq)
+        -- apply two_secrets temp_state zero_fin succ_fin
+        -- use
+        have new_agent_knows_new_agent : temp_state succ_fin succ_fin := by
+          simp [temp_state, initialState, addAgent]
+          sorry
+        -- put all_know_new_secret together with new_agent_knows_new_agent
+        sorry
+      -- Putting them together in the right format.
+      have final : ∀ (j : Fin (Nat.succ (k + 4))), temp_state i j := by
+        -- all old agents know the new agent's secret
+        have test : temp_state (Fin.castSucc i) succ_fin := by
+          aesop?
+
+        -- all old agents know all old secrets in the new state
+        have test1 : ∀ (j : Fin (k + 4)), temp_state i (Fin.castSucc j) := by
+          aesop?
+        simp [succ_fin] at test
+        simp_all only [ne_eq, Fin.lastCases_last, List.singleton_append, Fin.eta, not_false_eq_true, Fin.last, Fin.castSucc]
+        aesop?
+        sorry
+      aesop?
 
     simp [new_state, isExpert]
 
+    -- The goal is true for temp_state, which is weaker than new_state, so it's true for new_state.
     have subgoal_3 : moreGossip temp_state new_state := by
       simp [temp_state, new_state, calls_without_final_call, expandedSeq]
       apply makeCall_makes_gossip
