@@ -523,13 +523,26 @@ lemma addAgent_replacable {n : Nat} (σ : List (Call n)) : stateEquivalence (mak
   sorry
 
 
--- If an agent knows two secrets, then there is a call sequence which makes everyone learn the first secret then all other agents also learn the other secret.
+-- Given that agent a only knows secret b, and a call (a, c) makes some other agent c learn secret a, then the call must also make c learn b, provided c ≠ a and a ≠ b.
+@[simp]
+lemma single_call_specific {n : Nat} (s : GossipState (Nat.succ n)) (a b c : Fin (Nat.succ n)) : c ≠ a → a ≠ b → s a b → (makeCall s (a, c)) c a → (makeCall s (a, c)) c b := by
+  intros h_ca h_ab h_aca
+  simp [makeCall]
+  intro h
+  aesop?
+
+
+-- If an agent knows two secrets, then any call sequence which makes everyone learn the first secret also makes all other agents learn the other secret.
 -- Given that the other agents dont know either of those two secrets.
-lemma two_secrets_succ {n : Nat} (s : GossipState (Nat.succ n)) (a b : Fin (Nat.succ n)) :
+lemma two_secrets_succ' {n : Nat} (s : GossipState (Nat.succ n)) (a b : Fin (Nat.succ n)) (seq : List (Call (Nat.succ n))) :
   (∀ i : Fin (Nat.succ n), i ≠ a → ¬ s i a ∧ ¬ s i b) → -- Only agent a knows a and b
-  (∃ σ : List (Call (Nat.succ n)), ∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s σ) i a) → -- There exists a sequence making all agents learn secret a
-  ∃ σ : List (Call (Nat.succ n)), ∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s σ) i b := by -- Then, there exists a sequence making all agents learn secret b
+  (∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s seq) i a) →
+  ∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s seq) i b := by
+  intro i h h1 h2
+  -- maybe first do this for a call.
+  aesop?
   sorry
+
 -- Main lemma for the induction step
 lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 4))):
     checkIfEE (makeCalls (initialState (k + 4)) seq) →
@@ -675,18 +688,13 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
           sorry
         -- how do i apply two_secrets?
         -- we have the result of two secrets:
-        have all_know_new_secret :
-          ∃ σ, ∀ (i : Fin (Nat.succ (k + 4))), i ≠ zero_fin → makeCalls temp_state σ i succ_fin := by
-          simp [temp_state]
-          have h_known : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → ¬ temp_state i zero_fin ∧ ¬ temp_state i succ_fin := by
+        have all_know_new_secret : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ zero_fin → makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) i succ_fin := by
+          have h_known : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → ¬ (addAgent (initialState (k + 4))) i zero_fin ∧ ¬ (addAgent (initialState (k + 4))) i succ_fin := by
             sorry
-          have h_seq : ∃ σ : List (Call (Nat.succ (k + 4))), ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → (makeCalls temp_state σ) i zero_fin := by
+          have h_seq : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i zero_fin := by
             sorry
-          apply two_secrets_succ temp_state zero_fin succ_fin h_known h_seq
+          apply two_secrets_succ' (addAgent (initialState (k + 4))) zero_fin succ_fin (initial_call :: expandCalls seq) h_known h_seq
 
-          -- apply two_secrets temp_state zero_fin (initial_call :: expandCalls seq)
-        -- apply two_secrets temp_state zero_fin succ_fin
-        -- use
         have new_agent_knows_new_agent : temp_state succ_fin succ_fin := by
           simp [temp_state, initialState, addAgent]
           sorry
