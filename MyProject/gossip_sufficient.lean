@@ -97,7 +97,6 @@ def calls_big : List (Call 10) := [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6
 -- Prop: All gossip that is known in s1 is also known in s2.
 def moreGossip (s1 s2 : GossipState n) : Prop := ∀ a b : Fin n, (s1 a b) → (s2 a b)
 
-
 -- Adds an agent to a state, that knows only their own secret
 def addAgent (s : GossipState n) : GossipState (n.succ) :=
   λ a b => Fin.lastCases (b == Fin.last n)
@@ -122,6 +121,11 @@ def containsAdjusted {n : Nat} (σ : List (Call n)) (c : Fin (n + 1) × Fin (n +
 -- Two states are identical if they contain the same gossip.
 def stateEquivalence : GossipState n → GossipState n → Prop :=
   λ s1 s2 => ∀ a b, s1 a b ↔ s2 a b
+
+
+-- An agent always knows their own secret.
+lemma own_secret (s : GossipState n) (i : Fin n) : s i i := by
+  sorry
 
 
 -- Calling shares your own secret with the other agent.
@@ -219,6 +223,7 @@ n) : moreGossip s1 s2 → moreGossip (makeCall s1 c) (makeCall s2 c) := by
     · simp_all only [↓reduceIte]
       apply h
       simp_all only
+
 
 
 -- Adding the same calls to two states means the gossip relation remains.
@@ -375,11 +380,6 @@ lemma addAgent_expert_old {s : GossipState n} {i : Fin n} :
   exact Iff.intro h1 h2
 
 
--- Does the same for multiple agents.
-lemma addAgent_expert_olds {s : GossipState n}
-
-
-
 -- Very messy, needs to be cleaned up.
 -- We can replace addAgent with initialState (n + 1) in the following lemma n ≥ 4
 lemma addAgent_equals_succ {n : ℕ} :
@@ -512,39 +512,55 @@ lemma addAgent_equiv_calls {n : Nat} (σ : List (Call n)) (i : Fin n) :
 def contains (σ : List (Call n)) (a : Fin (n)) : Bool :=
   σ.any (λ c' => c'.1 = a ∨ c'.2 = a)
 
+
+-- STILL NEED TO LOOK AT THESE...
 -- Lemma stating that a call sequence of calls Fin n x Fin n can never contain Fin.last n
 lemma cant_contain_last {n : Nat} (σ : List (Call n)) :
   ¬ contains (expandCalls σ) (Fin.last n) := by
   sorry
 
 
+-- USED, unprovable in its current implementation (needs some type of contains part)
 lemma addAgent_replacable {n : Nat} (σ : List (Call n)) : stateEquivalence (makeCalls (addAgent (initialState n)) (expandCalls σ)) (addAgent (makeCalls (initialState n) σ)) := by
     -- The old sequence doesn't contain the old agent.
+
   sorry
 
 
 -- Given that agent a only knows secret b, and a call (a, c) makes some other agent c learn secret a, then the call must also make c learn b, provided c ≠ a and a ≠ b.
-@[simp]
 lemma single_call_specific {n : Nat} (s : GossipState (Nat.succ n)) (a b c : Fin (Nat.succ n)) : c ≠ a → a ≠ b → s a b → (makeCall s (a, c)) c a → (makeCall s (a, c)) c b := by
-  intros h_ca h_ab h_aca
+  intro h_ca _ h_aca
   simp [makeCall]
-  intro h
-  aesop?
-
+  simp_all only [ne_eq, not_false_eq_true]
+  rw [if_neg]
+  · aesop?
+  · rw [not_false_eq_true]
+    simp
 
 -- If an agent knows two secrets, then any call sequence which makes everyone learn the first secret also makes all other agents learn the other secret.
 -- Given that the other agents dont know either of those two secrets.
 lemma two_secrets_succ' {n : Nat} (s : GossipState (Nat.succ n)) (a b : Fin (Nat.succ n)) (seq : List (Call (Nat.succ n))) :
-  (∀ i : Fin (Nat.succ n), i ≠ a → ¬ s i a ∧ ¬ s i b) → -- Only agent a knows a and b
-  (∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s seq) i a) →
-  ∀ i : Fin (Nat.succ n), i ≠ a → (makeCalls s seq) i b := by
+  ∀ (i : Fin (Nat.succ n)), i ≠ a → ¬ s i a ∧ ¬ s i b → -- Only agent a knows a and b
+  (makeCalls s seq) i a → (makeCalls s seq) i b := by
   intro i h h1 h2
+
   -- maybe first do this for a call.
   induction seq
   case nil =>
-    simp [makeCalls]
-    sorry
+    simp [makeCalls] at h h2
+    simp_all only [not_true_eq_false, false_and]
   case cons =>
+    rename_i head tail tail_ih
+
+    rw [makeCalls_cons]
+    rw [makeCalls_cons] at h2
+    -- makecall s head give the same result in the goal and in h2 so i can simplify it to s
+    -- separate two cases
+    -- either head does contain agent a, or it doesn't
+    -- if it does, then whatever effect head has on s will be the same in the goal and in h2
+    -- if it doesn't, then head has no effect on s for agents to learn a or b
+    cases head
+    rename_i c1 c2
     sorry
 
 
@@ -702,9 +718,8 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
 
           have h_seq : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i zero_fin := by
             sorry
-
-          apply two_secrets_succ' (addAgent (initialState (k + 4))) zero_fin succ_fin (initial_call :: expandCalls seq) h_known h_seq
-
+          intro u y
+          apply two_secrets_succ' (addAgent (initialState (k + 4))) zero_fin succ_fin (initial_call :: expandCalls seq) u y (h_known u y) (h_seq u y)
         have new_agent_knows_new_agent : temp_state succ_fin succ_fin := by
           sorry
 
