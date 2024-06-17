@@ -480,7 +480,7 @@ lemma expandCalls_equiv_expandCall {n : Nat} (c : Call n) (cs : List (Call n)) :
   rfl
 
 
--- USED, UNFINISHED!
+-- unused
 -- Adding an agent at the end is equivalent to adding an agent at the start if the sequence doesn't contain calls to the new agent
 lemma addAgent_equiv_calls {n : Nat} (σ : List (Call n)) (i : Fin n) :
   (¬ containsAdjusted σ (i, Fin.last n)) ∧ (¬ containsAdjusted σ (Fin.last n, i)) →
@@ -680,10 +680,10 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
       have h'' : ∀ (j : Fin (k + 4)), (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i (Fin.castSucc j) := by
 
         -- Its true for this state
-        have test : ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) ↑↑i ↑↑j := by
+        have test : ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
 
           -- For all fin (k + 4), they know all but the last secret
-          have testtt : ∀ (i : Fin (k + 4)), ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) ↑↑i ↑↑j := by
+          have testtt : ∀ (i : Fin (k + 4)), ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
             intro i j
             rw [addAgent_replacable]
             simp [addAgent]
@@ -691,9 +691,13 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
 
           -- This is required, and similar, but not quite the same. How to transform? Shouldnt be too hard
           -- For all Fin (Nat.succ (k + 4)) where i ≠ Fin.last (k + 4), they know all but the last secret
-          have testttt : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ Fin.last (k + 4) → ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i ↑↑j := by
-            sorry
-
+          have testttt : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ Fin.last (k + 4) → ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i j.castSucc := by
+            intro i i_neq_last
+            cases i using Fin.lastCases
+            case last => exfalso; tauto
+            case cast foo i =>
+              intro j
+              exact testtt i j
           aesop?
 
         -- This state is stronger
@@ -753,7 +757,9 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
           aesop?
 
         have other_secrets_rewritten : ∀ (q : Fin (Nat.succ (k + 4))), temp_state i q := by
-          sorry
+          intro q
+          cases q using Fin.lastCases <;> cases i using Fin.lastCases
+          all_goals simp_all
 
         simp [succ_fin] at final_secret
 
