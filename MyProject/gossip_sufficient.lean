@@ -710,18 +710,30 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
           simp [temp_state, calls_without_final_call, expandedSeq]
           exact h'' zero_fin
 
-        -- how do i apply two_secrets?
-        -- we have the result of two secrets:
+        -- All agents except the new agent ge tto learn all secrets.
         have all_know_new_secret : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ zero_fin → makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) i succ_fin := by
+          -- Should be a result that is provable by the definition of initialstate and addAgent:
+          -- The secret a is only known by a before any calls.
           have h_known : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → ¬ (addAgent (initialState (k + 4))) i zero_fin ∧ ¬ (addAgent (initialState (k + 4))) i succ_fin := by
-            sorry
-
+            intro i h
+            constructor
+            · unfold initialState
+              simp [addAgent, zero_fin]
+              simp_all only [Fin.lastCases, Fin.reverseInduction, Fin.lastCases_last, Fin.lastCases_castSucc, not_false_eq_true]
+              simp [zero_fin] at h
+              sorry
+            · -- This probably requires a new hypothesis that i ≠ succ_fin.
+              sorry
+          -- After the calls, all agents learn a.
           have h_seq : ∀ i : Fin (Nat.succ (k + 4)), i ≠ zero_fin → (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i zero_fin := by
             sorry
           intro u y
+
+          -- Then they must also learn the new agents secret:
           apply two_secrets_succ' (addAgent (initialState (k + 4))) zero_fin succ_fin (initial_call :: expandCalls seq) u y (h_known u y) (h_seq u y)
+
         have new_agent_knows_new_agent : temp_state succ_fin succ_fin := by
-          sorry
+          apply own_secret
 
         -- put all_know_new_secret together with new_agent_knows_new_agent
         sorry
@@ -739,8 +751,10 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
         simp [succ_fin] at final_secret
         simp_all only [ne_eq, Fin.lastCases_last, List.singleton_append, Fin.eta, not_false_eq_true, Fin.last, Fin.castSucc]
 
+        -- We need to rewrite the previous result without casts.
         have other_secrets_cast : temp_state i j := by
-          sorry -- type thing
+          simp [temp_state]
+          sorry -- How?
         aesop?
       aesop?
 
