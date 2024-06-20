@@ -743,6 +743,9 @@ lemma two_secrets_succ_single {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a 
           left
           exact IH h
         · rename_i h
+          -- I want to just apply IH h, but the IH uses k and not c2
+          -- right
+          -- apply IH h
           rw [k_c1]
           -- k = c1
           right
@@ -794,16 +797,25 @@ lemma two_secrets_succ {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a b : Fin
   apply all_learn_a
 
 
-lemma lemma_1 {k : Nat} (seq : List (Call (k + 4))) (temp_state : GossipState (k + 4)) (IH : checkIfEE (makeCalls (initialState (k + 4)) seq))
-    (zero_fin : Fin (Nat.succ (k + 4))) (succ_fin : Fin (Nat.succ (k + 4))) (temp_state : GossipState (k + 4))
-  (expandedSeq_def : expandedSeq = expandCalls seq)
-  : ∀ (i : Fin (Nat.succ (k + 4))), temp_state zero_fin i := by
+lemma lemma_1 (k : Nat) (seq : List (Call (k + 4))) (temp_state : GossipState (Nat.succ (k + 4))) (IH : checkIfEE (makeCalls (initialState (k + 4)) seq)) (h : Nat.succ k + 4 ≥ 4)
+  : ∀ (i : Fin (Nat.succ (k + 4))), temp_state 0 i := by
   unfold checkIfEE at IH
+  let expandedSeq := expandCalls seq
+  let zero_fin : Fin (Nat.succ (k + 4)) := 0
+  let succ_fin : Fin (Nat.succ (k + 4)) := Fin.last (k + 4)
+  let initial_call : Call (Nat.succ (k + 4)) := (zero_fin, succ_fin)
+  let new_state := makeCall (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) expandedSeq) initial_call
+  let calls_without_final_call := [initial_call] ++ expandedSeq
+  let temp_state := makeCalls (addAgent (initialState (k + 4))) calls_without_final_call
+
+  have single_calls : new_state = makeCalls (initialState (Nat.succ (k + 4))) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
+    simp [new_state]
+    apply makeCalls_addAgent_initialState_equiv
+
   have h : ∀ i, i ≠ succ_fin → makeCalls (addAgent (initialState (k + 4))) expandedSeq zero_fin i := by
     simp_all only [expandedSeq, isExpert]
     let zero_fin_old := 0
     have h' : isExpert (makeCalls (initialState (k + 4)) seq) zero_fin_old := by
-      simp_all? only [new_state, expandedSeq]
       apply IH
 
     rw [addAgent_expert_old] at h'
@@ -825,12 +837,10 @@ lemma lemma_1 {k : Nat} (seq : List (Call (k + 4))) (temp_state : GossipState (k
     unfold moreGossip
     intro a b
     apply makeCall_makes_gossip
-  intro i a
+  intro i
   simp_all only [ne_eq, new_state, initial_call, zero_fin, succ_fin, expandedSeq]
   apply h'
   simp_all only [not_false_eq_true]
-
-
 
 -- Main lemma for the induction step
 lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 4))):
@@ -863,7 +873,7 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
       simp_all only [expandedSeq, isExpert]
       let zero_fin_old := 0
       have h' : isExpert (makeCalls (initialState (k + 4)) seq) zero_fin_old := by
-        simp_all? only [new_state, expandedSeq]
+        simp_all only [new_state, expandedSeq]
         apply IH
 
       rw [addAgent_expert_old] at h'
