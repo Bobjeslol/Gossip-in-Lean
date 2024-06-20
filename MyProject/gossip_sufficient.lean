@@ -19,6 +19,7 @@ import Mathlib.Data.Fintype.Basic
 import Mathlib.Tactic.Linarith
 import Mathlib.Data.Bool.Basic
 import Mathlib.Data.Matrix.Notation
+import Mathlib.Data.List.Indexes
 
 variable {n : ℕ}
 
@@ -518,13 +519,28 @@ lemma addAgent_makeCall_commute {n : Nat} (c : Call n) (someState : GossipState 
   intro x
   apply funext
   intro y
-  cases x
-  cases y
-  simp [makeCall]
-
-  simp [expandCall, addAgent, Fin.lastCases, Fin.reverseInduction]
-  -- There must be an easier way of approaching this.
-  sorry
+  rcases c with ⟨a,b⟩
+  simp [makeCall, expandCall]
+  -- Now the goal is depending on whether x=a, whether x=b
+  -- So let's split cases according to that.
+  cases em (x = Fin.castSucc a) <;> cases em (x = Fin.castSucc b)
+  -- Now we have 4 goals...
+  all_goals
+    simp_all [addAgent]
+  -- The goals now depend on whether y=Fin.last, so let's split cases on that.
+  all_goals
+    cases em (y = Fin.last n)
+  -- Now we have 8 goals...
+  all_goals
+    simp_all [makeCall, Fin.lastCases, Fin.reverseInduction]
+  -- Nowe we have 3 goals left...
+  · have : b = a := by
+      rw [← Fin.castSucc_inj]
+      rename_i h _ _
+      exact h
+    simp_all
+  · aesop
+  · aesop
 
 -- addAgent and makeCalls commute if the call sequence doesn't contain the new agent
 lemma addAgent_makeCalls_commute {n : Nat} (σ : List (Call n)) (someState : GossipState n):
@@ -555,7 +571,6 @@ lemma makeCall_equivalence {n : Nat} (a b : Fin n) (tail : List (Call n)) :
   simp_all
 
 
-
 -- The addAgent can be swapped with the makeCalls if the call sequence doesn't contain the last agent
 lemma addAgent_can_swap {n : Nat} (σ : List (Call n)) : ¬ contains (expandCalls σ) (Fin.last n) →
   addAgent (makeCalls (initialState n) σ) = makeCalls (addAgent (initialState n)) (expandCalls σ) := by
@@ -579,10 +594,8 @@ lemma addAgent_can_swap {n : Nat} (σ : List (Call n)) : ¬ contains (expandCall
       else
         simp [expandCalls]
         rw [makeCalls_cons]
-
         rw [addAgent_equiv_call (a, b) (Fin.last n)]
-        · -- fold everything back together, and use the induction hypothesis
-          have replacement : List.map expandCall tail = expandCalls tail := by
+        · have replacement : List.map expandCall tail = expandCalls tail := by
             simp [expandCalls]
           rw [replacement]
           rw [makeCall_equivalence a b tail]
@@ -616,8 +629,280 @@ lemma single_call_specific {n : Nat} (s : GossipState (Nat.succ n)) (a b c : Fin
     simp
 
 
--- If an agent knows two secrets (given that the other agents dont know either of those two secrets),
--- then any call sequence which makes everyone learn the first secret also makes all other agents learn the other secret.
+
+-- Given that only a knows a and b, then we can show that all agents that learn a also learn b.
+lemma test {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a b : Fin (Nat.succ (n + 4))) (seq : List (Call (Nat.succ (n + 4))))
+  (a_def : a = 0)
+  (b_def : b = Fin.last (n + 4))
+  (only_ab_know_ab : ∀ (i : Fin (Nat.succ (n + 4))), (i ≠ a ∧ i ≠ b) → ¬ s i a ∧ ¬ s i b)
+  (a_knows_b : s a b)
+  (b_knows_a : s b a)
+  (fin_succ_knows_own : s b b)
+  :
+  (∀ k, (makeCalls s seq) k a → (makeCalls s seq) k b) := by
+  intro k k_knows_a
+  induction seq using List.list_reverse_induction
+  -- The reverse_induction is to distinguish cases by adding a call at the end, not start.
+  case base =>
+    subst_eqs
+    simp [makeCalls] at *
+    cases em (k = 0) <;> cases em (k = Fin.last (n+4))
+    all_goals
+      simp_all
+  case ind seq theCall IH =>
+    rcases theCall with ⟨c1,c2⟩
+    simp [makeCalls] at *
+    simp [makeCall] at k_knows_a
+    cases em (c1 = a) <;> cases em (c2 = a)
+    -- c1 = a and c2 = a
+    · rename_i c1_a c2_a
+      rw [c1_a]
+      rw [c2_a]
+      simp [makeCall]
+      split
+      · right
+        apply calls_increase_gossip
+        exact a_knows_b
+      · rename_i k_not_a
+        have k_not_c1 : k ≠ c1 := by
+          aesop
+        rw [if_neg k_not_c1] at k_knows_a
+        split at k_knows_a
+        · cases k_knows_a
+          · rename_i h
+            apply IH h
+          · aesop
+        · apply IH k_knows_a
+    -- c1 = a and c2 ≠ a
+    · rename_i c1_a c2_not_a
+      rw [c1_a]
+      simp [makeCall]
+      split
+      · rename_i k_a
+        left
+        rw [k_a]
+        apply calls_increase_gossip
+        exact a_knows_b
+      · rename_i k_not_a
+        have k_not_c1 : k ≠ c1 := by
+          aesop
+        rw [if_neg k_not_c1] at k_knows_a
+        split at k_knows_a
+        · cases k_knows_a
+          · rename_i k_c2 h
+            rw [if_pos k_c2]
+            left
+            apply IH h
+          · rename_i k_c2 h
+            rw [if_pos k_c2]
+            right
+            apply calls_increase_gossip
+            exact a_knows_b
+        · rename_i k_neq_c2
+          rw [if_neg k_neq_c2]
+          apply IH k_knows_a
+    -- c1 ≠ a and c2 = a
+    · rename_i c1_not_a c2_a
+      rw [c2_a]
+      simp [makeCall]
+      split
+      · rename_i k_a k_a
+        right
+        apply calls_increase_gossip
+        exact a_knows_b
+      · rename_i k_not_a
+        split
+        split at k_knows_a
+        · cases k_knows_a
+          · rename_i k_a k_c1 h
+            left
+            exact IH h
+          · contradiction
+        · rename_i k_a k_neq_c1
+          split at k_knows_a
+          · rename_i k_c2
+            cases k_knows_a
+            · rename_i h
+              left
+              exact IH h
+            · rename_i h
+              left
+              rw [k_a]
+              apply calls_increase_gossip
+              exact a_knows_b
+          · aesop
+        · rename_i k_not_c1 k_not_a
+          aesop
+    -- c1 ≠ a and c2 ≠ a
+    · rename_i c1_not_a c2_not_a
+      simp [makeCall]
+      split
+      · rename_i k_c1
+        rw [if_pos k_c1] at k_knows_a
+        cases k_knows_a
+        · rename_i h
+          left
+          exact IH h
+        · rename_i h
+          sorry
+      · split
+        · rename_i k_not_c1 k_c2
+          rw [if_neg k_not_c1] at k_knows_a
+          rw [if_pos k_c2] at k_knows_a
+          cases k_knows_a
+          · left
+            rename_i h
+            exact IH h
+          · rename_i h
+            sorry
+        · split at k_knows_a
+          · contradiction
+          · rename_i k_not_c1 k_not_c2
+            exact IH k_knows_a
+
+
+-- Given that only a knows a and b, then we can show that all agents that learn a also learn b.
+lemma two_secrets_succ_single {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a b : Fin (Nat.succ (n + 4))) (seq : List (Call (Nat.succ (n + 4))))
+  (a_def : a = 0)
+  (b_def : b = Fin.last (n + 4))
+  (only_ab_know_ab : ∀ (i : Fin (Nat.succ (n + 4))), (i ≠ a ∧ i ≠ b) → ¬ s i a ∧ ¬ s i b)
+  (a_knows_b : s a b)
+  (b_knows_a : s b a)
+  (fin_succ_knows_own : s b b)
+  :
+  (∀ k, (makeCalls s seq) k a → (makeCalls s seq) k b) := by
+  intro k k_knows_a
+  induction seq using List.list_reverse_induction
+  -- The reverse_induction is to distinguish cases by adding a call at the end, not start.
+  case base =>
+    subst_eqs
+    simp [makeCalls] at *
+    cases em (k = 0) <;> cases em (k = Fin.last (n+4))
+    all_goals
+      simp_all
+  case ind seq theCall IH =>
+    rcases theCall with ⟨c1,c2⟩
+    simp [makeCalls] at *
+    -- Is a in the call?
+    if h_a_first : c1 = a then
+      rw [h_a_first]
+      rw [h_a_first] at k_knows_a
+      -- apply ih to c2
+      cases Classical.em (k = c2)
+      · rename_i k_c2
+        rw [k_c2]
+        simp [makeCall]
+        split
+        · rename_i h
+          rw [h]
+          apply calls_increase_gossip
+          exact a_knows_b
+        · rename_i h
+          right
+          apply calls_increase_gossip
+          exact a_knows_b
+      · rename_i k_not_c2
+        simp [makeCall] at k_knows_a
+        split at k_knows_a
+        · rename_i k_a
+          rw [k_a]
+          simp [makeCall]
+          left
+          apply calls_increase_gossip
+          exact a_knows_b
+        · rename_i k_not_a
+          simp [makeCall]
+          rw [if_neg k_not_a]
+          rw [if_neg k_not_c2]
+          exact IH k_knows_a
+    -- a ≠ c1
+    else
+      if h_a_second : c2 = a then
+        rw [h_a_second]
+        rw [h_a_second] at k_knows_a
+        cases Classical.em (k = c1)
+        · rename_i k_c1
+          rw [k_c1]
+          rw [k_c1] at k_knows_a
+          simp [makeCall] at k_knows_a
+          simp [makeCall]
+          cases k_knows_a
+          · rename_i h
+            left
+            rw [←k_c1]
+            rw [←k_c1] at h
+            apply IH h
+          · rename_i h
+            right
+            apply calls_increase_gossip
+            exact a_knows_b
+        · rename_i k_not_c1
+          simp [makeCall] at k_knows_a
+          rw [if_neg k_not_c1] at k_knows_a
+          split at k_knows_a
+          · cases k_knows_a
+            · rename_i k_a h
+              simp [makeCall]
+              rw [if_neg k_not_c1]
+              rw [if_pos k_a]
+              left
+              apply IH h
+            · rename_i k_a h
+              simp [makeCall]
+              rw [if_neg k_not_c1]
+              rw [if_pos k_a]
+              left
+              rw [k_a]
+              apply calls_increase_gossip
+              exact a_knows_b
+          · simp [makeCall]
+            rw [if_neg k_not_c1]
+            rename_i k_not_a
+            rw [if_neg k_not_a]
+            apply IH k_knows_a
+      else
+        -- a is not in the call
+        simp [makeCall]
+        simp [makeCall] at k_knows_a
+        split at k_knows_a
+        split
+        cases k_knows_a
+        · left
+          rename_i h
+          apply IH h
+        · right
+          rename_i k_c1 h
+          cases Classical.em (b = c2)
+          · rename_i b_c2
+            rw [←b_c2]
+            apply calls_increase_gossip
+            exact fin_succ_knows_own
+          · rename_i b_not_c2
+
+            sorry
+
+        · cases k_knows_a
+          aesop
+          aesop
+        · split at k_knows_a
+          split
+          · aesop
+          · cases k_knows_a
+            · aesop
+            · right
+              rename_i h
+              cases Classical.em (b = c2)
+              · rename_i b_c2
+                sorry
+              ·
+                sorry
+          · rename_i k_not_c1 k_not_c2
+            rw [if_neg k_not_c1]
+            rw [if_neg k_not_c2]
+            aesop
+
+
+-- Given that only agent a knows a and b, and some sequence makes everyone else learn a, then everyone else also learns b
 lemma two_secrets_succ {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a b : Fin (Nat.succ (n + 4))) (seq : List (Call (Nat.succ (n + 4))))
   (a_def : a = 0)
   (b_def : b = Fin.last (n + 4))
@@ -625,27 +910,50 @@ lemma two_secrets_succ {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a b : Fin
   (a_knows_b : s a b)
   (b_knows_a : s b a)
   (all_learn_a : ∀ j, (makeCalls s seq) j a)
+  (fin_succ_knows_own : s b b)
   :
   (∀ k, (makeCalls s seq) k b) := by
   intro k
-  induction seq
-  case nil =>
-    subst_eqs
-    simp_all [makeCalls,makeCall]
-    specialize only_ab_know_ab 1
-    simp_all
-    absurd only_ab_know_ab
-    exfalso
-    apply ne_of_lt at only_ab_know_ab
-    · exact only_ab_know_ab
-    · apply Fin.one_lt_last
-  case cons head tail tail_ih =>
-    rw [makeCalls_cons] at all_learn_a
-    rw [makeCalls_cons]
-    cases head
-    rename_i c1 c2
+  apply two_secrets_succ_single s a b seq a_def b_def only_ab_know_ab a_knows_b b_knows_a fin_succ_knows_own
+  apply all_learn_a
 
-    sorry
+
+lemma lemma_1 {k : Nat} (seq : List (Call (k + 4))) (temp_state : GossipState (k + 4)) (IH : checkIfEE (makeCalls (initialState (k + 4)) seq))
+    (zero_fin : Fin (Nat.succ (k + 4))) (succ_fin : Fin (Nat.succ (k + 4))) (temp_state : GossipState (k + 4))
+  (expandedSeq_def : expandedSeq = expandCalls seq)
+  : ∀ (i : Fin (Nat.succ (k + 4))), temp_state zero_fin i := by
+  unfold checkIfEE at IH
+  have h : ∀ i, i ≠ succ_fin → makeCalls (addAgent (initialState (k + 4))) expandedSeq zero_fin i := by
+    simp_all only [expandedSeq, isExpert]
+    let zero_fin_old := 0
+    have h' : isExpert (makeCalls (initialState (k + 4)) seq) zero_fin_old := by
+      simp_all? only [new_state, expandedSeq]
+      apply IH
+
+    rw [addAgent_expert_old] at h'
+    simp [succ_fin]
+    have replacement := addAgent_replacable seq zero_fin_old -- Still need to do the addAgent_replacable proof
+    simp [stateEquivalence] at replacement
+
+    apply Fin.lastCases
+    · intro a
+      simp_all only [le_add_iff_nonneg_left, zero_le, Nat.cast_zero]
+    · intro i a
+      simp_all only [Nat.cast_zero, Fin.castSucc_zero, zero_fin_old]
+
+  -- New_state contains more gossip than temp_state.
+  have h' : moreGossip (makeCalls (addAgent (initialState (k + 4))) expandedSeq) temp_state := by
+    simp [temp_state, calls_without_final_call, expandedSeq]
+    rw [addAgent_equals_succ, makeCalls_cons]
+    apply makeCalls_increases_gossip
+    unfold moreGossip
+    intro a b
+    apply makeCall_makes_gossip
+  intro i a
+  simp_all only [ne_eq, new_state, initial_call, zero_fin, succ_fin, expandedSeq]
+  apply h'
+  simp_all only [not_false_eq_true]
+
 
 
 -- Main lemma for the induction step
@@ -666,6 +974,10 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
     simp [new_state]
     apply makeCalls_addAgent_initialState_equiv
 
+  have milestone_1_test : ∀ i, i ≠ succ_fin → temp_state zero_fin i := by
+
+    exact lemma_1
+
   -- The first agent knows all secrets except the new agent's secret
   have milestone_1 : ∀ i, i ≠ succ_fin → temp_state zero_fin i := by
     unfold checkIfEE at IH
@@ -675,7 +987,7 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
       simp_all only [expandedSeq, isExpert]
       let zero_fin_old := 0
       have h' : isExpert (makeCalls (initialState (k + 4)) seq) zero_fin_old := by
-        simp_all only [new_state, succ_fin, expandedSeq]
+        simp_all? only [new_state, expandedSeq]
         apply IH
 
       rw [addAgent_expert_old] at h'
@@ -736,11 +1048,8 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
 
   -- Putting milestone_1 and milestone_2 together, we get that all but the last agents are experts
   have milestone_4 : ∀ i, i ≠ succ_fin → isExpert new_state i := by
-    have subgoal_1 : makeCall (initialState (Nat.succ (k + 4))) initial_call zero_fin succ_fin := by
-      apply makeCall_shares_secrets
-
     -- The goal is true for temp_state.
-    have subgoal_2 : ∀ i, i ≠ succ_fin → ∀ j, temp_state i j := by
+    have subgoal_1 : ∀ i, i ≠ succ_fin → ∀ j, temp_state i j := by
       intro i h
       simp [temp_state, calls_without_final_call, expandedSeq]
       simp [checkIfEE] at IH
@@ -764,7 +1073,7 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
             intro i j
             rw [addAgent_replacable]
             simp [addAgent]
-            aesop?
+            aesop
 
           -- This is required, and similar, but not quite the same. How to transform? Shouldnt be too hard
           -- For all Fin (Nat.succ (k + 4)) where i ≠ Fin.last (k + 4), they know all but the last secret
@@ -775,14 +1084,14 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
             case cast foo i =>
               intro j
               exact know_all_but_last i j
-          aesop?
+          aesop
 
         -- This state is stronger
         have stronger_state : moreGossip (makeCalls (addAgent (initialState (k + 4))) (expandCalls seq)) (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) := by
           apply makeCalls_increases_gossip
           apply makeCall_makes_gossip
 
-        aesop?
+        aesop
 
       -- All i learn the secret of the new agent as well.
       have h''' : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) (i.castSucc) succ_fin := by
@@ -795,6 +1104,14 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
 
         -- All agents get to learn the new agent's secret.
         have all_know_new_secret : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) i.castSucc succ_fin := by
+          have fin_succ_knows_own : makeCall (addAgent (initialState (k + 4))) initial_call succ_fin succ_fin := by
+            simp [makeCall, addAgent]
+            split
+            · have less : 1 < Fin.last (k + 4) := by
+                apply Fin.one_lt_last
+              aesop
+            · simp [Fin.lastCases, Fin.reverseInduction]
+
           apply two_secrets_succ (makeCall (addAgent (initialState (k + 4))) initial_call) zero_fin succ_fin (expandCalls seq) (by aesop) (by unfold_let succ_fin; rfl)
           case only_ab_know_ab =>
             intro i h
@@ -802,13 +1119,13 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
             · cases i using Fin.lastCases
               case last =>
                 aesop
-              case cast foo i =>
+              case cast _ i =>
                 simp [initial_call, makeCall, addAgent, initialState]
                 aesop
             · cases i using Fin.lastCases
               case last =>
                 aesop
-              case cast foo i =>
+              case cast _ i =>
                 simp [initial_call, makeCall, addAgent, initialState]
                 aesop
           case a_knows_b =>
@@ -833,7 +1150,7 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
                 intro i j
                 rw [addAgent_replacable]
                 simp [addAgent]
-                aesop?
+                aesop
               have weaker : moreGossip (makeCalls (addAgent (initialState (k + 4))) (expandCalls seq)) (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq)) := by
                 apply makeCalls_increases_gossip
                 apply makeCall_makes_gossip
@@ -850,8 +1167,6 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
               · simp [succ_fin, zero_fin]
                 right
                 simp [Fin.lastCases, Fin.reverseInduction]
-                have less : 1 < Fin.last (k + 4) := by
-                  apply Fin.one_lt_last
                 aesop
               · have less : 1 < Fin.last (k + 4) := by
                   apply Fin.one_lt_last
@@ -863,6 +1178,8 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
             case cast foo j =>
               rw [makeCalls_cons] at h''
               exact old_agents_learn_a j
+          case fin_succ_knows_own =>
+            exact fin_succ_knows_own
 
         -- Type mismatch, need to fix.
         cases i using Fin.lastCases
@@ -888,24 +1205,19 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
           all_goals simp_all
 
         simp [succ_fin] at final_secret
-
-        -- We need to rewrite the previous result without castSuccs.
-        have other_secrets_cast : temp_state i j := by
-          simp [temp_state]
-          aesop
         aesop
       aesop
 
     simp [new_state, isExpert]
 
     -- The goal is true for temp_state, which is weaker than new_state, so it's true for new_state.
-    have subgoal_3 : moreGossip temp_state new_state := by
+    have subgoal_2 : moreGossip temp_state new_state := by
       simp [temp_state, new_state, calls_without_final_call, expandedSeq]
       apply makeCall_makes_gossip
 
     intro i a j
     simp_all only [ne_eq, new_state]
-    apply subgoal_3
+    apply subgoal_2
     simp_all only [not_false_eq_true]
 
   -- Using the final call, we can show that the new agent also becomes an expert
@@ -914,8 +1226,6 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
       unfold isExpert
       intro j
       simp_all only [temp_state, calls_without_final_call]
-      have expert : isExpert temp_state zero_fin := by
-        exact milestone_3
       simp_all only [List.singleton_append]
       apply milestone_3
 
