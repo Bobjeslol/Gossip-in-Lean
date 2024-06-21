@@ -629,6 +629,7 @@ lemma single_call_specific {n : Nat} (s : GossipState (Nat.succ n)) (a b c : Fin
     simp
 
 
+
 -- Given that only a knows a and b, then we can show that all agents that learn a also learn b.
 lemma two_secrets_succ_single {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a b : Fin (Nat.succ (n + 4))) (seq : List (Call (Nat.succ (n + 4))))
   (a_def : a = 0)
@@ -639,16 +640,16 @@ lemma two_secrets_succ_single {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a 
   (fin_succ_knows_own : s b b)
   :
   (∀ k, (makeCalls s seq) k a → (makeCalls s seq) k b) := by
-  intro k k_knows_a
   induction seq using List.list_reverse_induction
-  -- The reverse_induction is to distinguish cases by adding a call at the end, not start.
   case base =>
+    intro k k_knows_a
     subst_eqs
     simp [makeCalls] at *
     cases em (k = 0) <;> cases em (k = Fin.last (n+4))
     all_goals
       simp_all
   case ind seq theCall IH =>
+    intro k k_knows_a
     rcases theCall with ⟨c1,c2⟩
     simp [makeCalls] at *
     simp [makeCall] at k_knows_a
@@ -659,79 +660,69 @@ lemma two_secrets_succ_single {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a 
       rw [c2_a]
       simp [makeCall]
       split
-      · right
-        apply calls_increase_gossip
-        exact a_knows_b
-      · rename_i k_not_a
-        have k_not_c1 : k ≠ c1 := by
-          aesop
-        rw [if_neg k_not_c1] at k_knows_a
-        split at k_knows_a
-        · cases k_knows_a
-          · rename_i h
-            apply IH h
-          · aesop
-        · apply IH k_knows_a
-    -- c1 = a and c2 ≠ a
-    · rename_i c1_a c2_not_a
-      rw [c1_a]
-      simp [makeCall]
-      split
       · rename_i k_a
-        left
-        rw [k_a]
-        apply calls_increase_gossip
-        exact a_knows_b
-      · rename_i k_not_a
-        have k_not_c1 : k ≠ c1 := by
-          aesop
-        rw [if_neg k_not_c1] at k_knows_a
-        split at k_knows_a
-        · cases k_knows_a
-          · rename_i k_c2 h
-            rw [if_pos k_c2]
-            left
-            apply IH h
-          · rename_i k_c2 h
-            rw [if_pos k_c2]
-            right
-            apply calls_increase_gossip
-            exact a_knows_b
-        · rename_i k_neq_c2
-          rw [if_neg k_neq_c2]
-          apply IH k_knows_a
-    -- c1 ≠ a and c2 = a
-    · rename_i c1_not_a c2_a
-      rw [c2_a]
-      simp [makeCall]
-      split
-      · rename_i k_a k_a
         right
         apply calls_increase_gossip
         exact a_knows_b
       · rename_i k_not_a
-        split
         split at k_knows_a
         · cases k_knows_a
-          · rename_i k_a k_c1 h
-            left
-            exact IH h
-          · contradiction
-        · rename_i k_a k_neq_c1
-          split at k_knows_a
+          · rename_i h
+            apply IH k h
+          · rename_i h k_c1
+            aesop
+        · have k_not_c2 : k ≠ c2 := by
+            aesop
+          rw [if_neg k_not_c2] at k_knows_a
+          apply IH k k_knows_a
+    -- c1 = a and c2 ≠ a
+    · rename_i c1_a c2_not_a
+      simp [makeCall]
+      split
+      · rename_i k_c1
+        left
+        rw [k_c1]
+        rw [c1_a]
+        apply calls_increase_gossip
+        exact a_knows_b
+      · rename_i k_not_c1
+        split at k_knows_a
+        · rename_i k_c1
+          contradiction
+        · split
           · rename_i k_c2
+            rw [if_pos k_c2] at k_knows_a
             cases k_knows_a
             · rename_i h
               left
-              exact IH h
+              apply IH k h
             · rename_i h
-              left
-              rw [k_a]
+              right
+              rw [c1_a]
               apply calls_increase_gossip
               exact a_knows_b
-          · aesop
-        · rename_i k_not_c1 k_not_a
-          aesop
+          ·  aesop
+    -- c1 ≠ a and c2 = a
+    · rename_i c1_not_a c2_a
+      simp [makeCall]
+      split
+      · rename_i k_c1
+        right
+        rw [c2_a]
+        apply calls_increase_gossip
+        exact a_knows_b
+      · rename_i k_not_c1
+        split
+        · rename_i k_c2
+          rw [k_c2]
+          rw [c2_a]
+          left
+          apply calls_increase_gossip
+          exact a_knows_b
+        · rename_i k_not_c2
+          rw [if_neg k_not_c1] at k_knows_a
+          rw [if_neg k_not_c2] at k_knows_a
+          apply IH k k_knows_a
     -- c1 ≠ a and c2 ≠ a
     · rename_i c1_not_a c2_not_a
       simp [makeCall]
@@ -741,44 +732,24 @@ lemma two_secrets_succ_single {n : Nat} (s : GossipState (Nat.succ (n + 4))) (a 
         cases k_knows_a
         · rename_i h
           left
-          exact IH h
+          apply IH k h
         · rename_i h
-          -- I want to just apply IH h, but the IH uses k and not c2
-          -- right
-          -- apply IH h
-          rw [k_c1]
-          -- k = c1
-          right
-          -- This doesn't seem right...
-          induction seq
-          · simp [makeCall] at h
-            simp [makeCall]
-            -- doable
-            -- c2 must be b cause no one else knows a and c2 cant be a
-            have c2_eq_b : c2 = b := by
-
-              sorry
-            aesop
-          · rename_i head tail
-            -- not sure how to approach this
-            sorry
-      · split
-        · rename_i k_not_c1 k_c2
-          rw [if_neg k_not_c1] at k_knows_a
-          rw [if_pos k_c2] at k_knows_a
-          cases k_knows_a
-          · left
-            rename_i h
-            exact IH h
-          · rename_i h
-            -- k = c2
-            have c2_knows_a : List.foldl makeCall s seq c2 a := by
-              sorry
-            aesop
-        · split at k_knows_a
-          · contradiction
-          · rename_i k_not_c1 k_not_c2
-            exact IH k_knows_a
+          aesop
+      · rename_i k_not_c1
+        · split
+          · rename_i k_c2
+            rw [if_pos k_c2] at k_knows_a
+            rw [if_neg k_not_c1] at k_knows_a
+            · rename_i h
+              cases k_knows_a
+              · rename_i h
+                left
+                apply IH k h
+              · aesop
+          · rename_i k_not_c2
+            rw [if_neg k_not_c1] at k_knows_a
+            rw [if_neg k_not_c2] at k_knows_a
+            apply IH k k_knows_a
 
 
 -- Given that only agent a knows a and b, and some sequence makes everyone else learn a, then everyone else also learns b
