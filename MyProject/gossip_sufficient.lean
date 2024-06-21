@@ -852,202 +852,184 @@ lemma lemma_3 {k : Nat} (seq : List (Call (k + 4))) (IH : checkIfEE (makeCalls (
     simp [temp_state] at h1
     exact h1 l
 
-
-lemma lemma_4 {k : Nat} (seq : List (Call (k + 4))) (IH : checkIfEE (makeCalls (initialState (k + 4)) seq)) :
-  makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq) zero_fin succ_fin := by
-  let calls_without_final_call := [initial_call] ++ (expandCalls seq)
-  let temp_state := makeCalls (addAgent (initialState (k + 4))) calls_without_final_call
+lemma lemma_4_subgoal_1 {k : Nat} (seq : List (Call (k + 4))) (IH : checkIfEE (makeCalls (initialState (k + 4)) seq)) :
+  ∀ i, i ≠ succ_fin → ∀ j, (makeCalls (makeCall (addAgent (initialState (k + 4))) (0, Fin.last (k + 4))) (expandCalls seq)) i j := by
+  let zero_fin : (Fin (Nat.succ (n + 4))) := 0
+  let succ_fin : (Fin (Nat.succ (n + 4))) := Fin.last (n + 4)
+  let initial_call : Call (Nat.succ (k + 4)) := (zero_fin, succ_fin)
   let expandedSeq := expandCalls seq
--- The goal is true for temp_state.
-  have subgoal_1 : ∀ i, i ≠ succ_fin → ∀ j, temp_state i j := by
-    intro i h
-    simp [temp_state, calls_without_final_call, expandedSeq]
-    simp [checkIfEE] at IH
+  let new_state := makeCall (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) expandedSeq) initial_call
+  let calls_without_final_call := [initial_call] ++ expandedSeq
+  let temp_state := makeCalls (addAgent (initialState (k + 4))) calls_without_final_call
 
-    -- All agents of the old state are experts in the old state.
-    have h' : isExpert (makeCalls (initialState (k + 4)) seq) i := by
-      apply IH
+  have milestone_1 : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ succ_fin → temp_state zero_fin i := by
+    sorry
+  have milestone_2 : temp_state zero_fin succ_fin := by
+    sorry
+  have milestone_3 : isExpert temp_state zero_fin := by
+    sorry
 
-    -- Need to introduce new agent's secret.
-    rw [addAgent_expert_old] at h'
+  intro i h
+  -- rw [← makeCalls_cons]
+  -- simp [temp_state, calls_without_final_call, expandedSeq]
+  simp [checkIfEE] at IH
 
-    -- We can rewrite the addAgent one layer deeper and add the initial call without losing gossip.
-    -- All old agents know all old secrets in the new state
-    have h'' : ∀ (j : Fin (k + 4)), (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i (Fin.castSucc j) := by
+  -- All agents of the old state are experts in the old state.
+  have h' : isExpert (makeCalls (initialState (k + 4)) seq) i := by
+    apply IH
 
-      -- Its true for this state
-      have weaker_state : ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
+  -- Need to introduce new agent's secret.
+  rw [addAgent_expert_old] at h'
 
-        -- For all fin (k + 4), they know all but the last secret
-        have know_all_but_last : ∀ (i : Fin (k + 4)), ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
-          intro i j
-          rw [addAgent_replacable]
-          simp [addAgent]
-          aesop
+  -- We can rewrite the addAgent one layer deeper and add the initial call without losing gossip.
+  -- All old agents know all old secrets in the new state
+  have h'' : ∀ (j : Fin (k + 4)), (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i (Fin.castSucc j) := by
 
-        -- This is required, and similar, but not quite the same. How to transform? Shouldnt be too hard
-        -- For all Fin (Nat.succ (k + 4)) where i ≠ Fin.last (k + 4), they know all but the last secret
-        have type_cast : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ Fin.last (k + 4) → ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i j.castSucc := by
-          intro i i_neq_last
-          cases i using Fin.lastCases
-          case last => exfalso; tauto
-          case cast i =>
-            intro j
-            exact know_all_but_last i j
+    -- Its true for this state
+    have weaker_state : ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
+
+      -- For all fin (k + 4), they know all but the last secret
+      have know_all_but_last : ∀ (i : Fin (k + 4)), ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
+        intro i j
+        rw [addAgent_replacable]
+        simp [addAgent]
         aesop
 
-      -- This state is stronger
-      have stronger_state : moreGossip (makeCalls (addAgent (initialState (k + 4))) (expandCalls seq)) (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) := by
-        apply makeCalls_increases_gossip
-        apply makeCall_makes_gossip
-
-      aesop
-
-    -- All i learn the secret of the new agent as well.
-    have h''' : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) (i.castSucc) succ_fin := by
-      -- prepare for the lemma.
-      have agent_0_knows_both : temp_state zero_fin succ_fin ∧ temp_state zero_fin zero_fin := by
-        constructor
-        · apply lemma_3 seq IH
-        · apply lemma_3 seq IH
-
-
-      -- All agents get to learn the new agent's secret.
-      have all_know_new_secret : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) i.castSucc succ_fin := by
-        have fin_succ_knows_own : (makeCall (addAgent (initialState (k + 4))) initial_call) succ_fin succ_fin := by
-          simp_all only [makeCall, addAgent]
-          split
-          · have less : 1 < Fin.last (k + 4) := by
-              apply Fin.one_lt_last
-
-            aesop
-          · simp [Fin.lastCases, Fin.reverseInduction]
-
-        apply two_secrets_succ (makeCall (addAgent (initialState (k + 4))) initial_call) zero_fin succ_fin (expandCalls seq) (by aesop) (by unfold_let succ_fin; rfl)
-        case only_ab_know_ab =>
-          intro i h
-          constructor
-          · cases i using Fin.lastCases
-            case last =>
-              aesop
-            case cast _ i =>
-              simp [initial_call, makeCall, addAgent, initialState]
-              aesop
-          · cases i using Fin.lastCases
-            case last =>
-              aesop
-            case cast _ i =>
-              simp [initial_call, makeCall, addAgent, initialState]
-              aesop
-        case a_knows_b =>
-          simp [makeCall]
-          right
-          simp [addAgent, initialState]
-          aesop
-        case b_knows_a =>
-          simp [makeCall, zero_fin, succ_fin]
-          rw [if_neg]
-          · right
-            simp [addAgent, initialState, Fin.lastCases, Fin.reverseInduction]
-            aesop
-          · have less : 1 < Fin.last (k + 4) := by
-              apply Fin.one_lt_last
-            aesop
-        case all_learn_a =>
-          have old_agents_learn_a : ∀ (j : Fin (k + 4)), makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq) j.castSucc zero_fin := by
-            intro j
-            -- Reusing old have statement that is no longer in scope.
-            have know_all_but_last : ∀ (i : Fin (k + 4)), ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
-              intro i j
-              rw [addAgent_replacable]
-              simp [addAgent]
-              aesop
-            have weaker : moreGossip (makeCalls (addAgent (initialState (k + 4))) (expandCalls seq)) (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq)) := by
-              apply makeCalls_increases_gossip
-              apply makeCall_makes_gossip
-            apply weaker
-            exact know_all_but_last j zero_fin
-
-          have new_agent_learns_a : makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq) succ_fin zero_fin := by
-            have weaker : moreGossip (makeCall (addAgent (initialState (k + 4))) initial_call) (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq)) := by
-              apply calls_increase_gossip
-
-            apply weaker
-            simp_all only [makeCall, addAgent, initialState]
-            rw [if_neg]
-            · simp [succ_fin, zero_fin]
-              right
-              simp [Fin.lastCases, Fin.reverseInduction]
-              aesop
-            · have less : 1 < Fin.last (k + 4) := by
-                apply Fin.one_lt_last
-              aesop
-
+      -- This is required, and similar, but not quite the same. How to transform? Shouldnt be too hard
+      -- For all Fin (Nat.succ (k + 4)) where i ≠ Fin.last (k + 4), they know all but the last secret
+      have type_cast : ∀ (i : Fin (Nat.succ (k + 4))), i ≠ Fin.last (k + 4) → ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i j.castSucc := by
+        intro i i_neq_last
+        cases i using Fin.lastCases
+        case last => exfalso; tauto
+        case cast i =>
           intro j
-          cases j using Fin.lastCases
-          case last => exact new_agent_learns_a
-          case cast foo j =>
-            rw [makeCalls_cons] at h''
-            exact old_agents_learn_a j
-        case fin_succ_knows_own =>
-          exact fin_succ_knows_own
-
-      -- Type mismatch, need to fix.
-      cases i using Fin.lastCases
-      case last => exfalso; tauto
-      case cast foo i =>
-        exact all_know_new_secret
-
-
-    -- Putting them together in the right format.
-    have final : ∀ (j : Fin (Nat.succ (k + 4))), temp_state i j := by
-      intro j
-      -- all old agents know the new agent's secret
-      have final_secret : temp_state (i.castSucc) succ_fin := by
-        aesop
-
-      -- all old agents know all old secrets in the new state
-      have other_secrets : ∀ (q : Fin (k + 4)), temp_state i (q.castSucc) := by
-        aesop
-
-      have other_secrets_rewritten : ∀ (q : Fin (Nat.succ (k + 4))), temp_state i q := by
-        intro q
-        cases q using Fin.lastCases <;> cases i using Fin.lastCases
-        all_goals simp_all
-
-      simp [succ_fin] at final_secret
+          exact know_all_but_last i j
       aesop
+
+    -- This state is stronger
+    have stronger_state : moreGossip (makeCalls (addAgent (initialState (k + 4))) (expandCalls seq)) (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) := by
+      apply makeCalls_increases_gossip
+      apply makeCall_makes_gossip
+
     aesop
 
+  -- All i learn the secret of the new agent as well.
+  have h''' : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) (i.castSucc) succ_fin := by
+    -- prepare for the lemma.
+    have agent_0_knows_both : temp_state zero_fin succ_fin ∧ temp_state zero_fin zero_fin := by
+      constructor
+      · apply lemma_3 seq IH
+      · apply lemma_3 seq IH
+
+    -- All agents get to learn the new agent's secret.
+    have all_know_new_secret : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) i.castSucc succ_fin := by
+      have fin_succ_knows_own : makeCall (addAgent (initialState (k + 4))) initial_call succ_fin succ_fin := by
+        simp only [makeCall, addAgent, beq_self_eq_true, or_self, ↓reduceIte] -- the state here is very different from the state on line 1126
+        split
+        · have less : 1 < Fin.last (k + 4) := by
+            apply Fin.one_lt_last
+          aesop?
+          sorry
+        · simp [Fin.lastCases, Fin.reverseInduction]
+          sorry
+
+      apply two_secrets_succ (makeCall (addAgent (initialState (k + 4))) initial_call) zero_fin succ_fin (expandCalls seq) (by aesop) (by unfold_let succ_fin; rfl) -- not sure how to approach this
+      case only_ab_know_ab =>
+        intro i h
+        constructor
+        · cases i using Fin.lastCases
+          case last =>
+            aesop
+          case cast _ i =>
+            simp [initial_call, makeCall, addAgent, initialState]
+            aesop?
+        · cases i using Fin.lastCases
+          case last =>
+            aesop?
+          case cast _ i =>
+            simp [initial_call, makeCall, addAgent, initialState]
+            aesop?
+      case a_knows_b =>
+        simp [makeCall]
+        right
+        simp [addAgent, initialState]
+        aesop
+      case b_knows_a =>
+        simp [makeCall, zero_fin, succ_fin]
+        rw [if_neg]
+        · right
+          simp [addAgent, initialState, Fin.lastCases, Fin.reverseInduction]
+          aesop
+        · have less : 1 < Fin.last (k + 4) := by
+            apply Fin.one_lt_last
+          aesop
+      case all_learn_a =>
+        have old_agents_learn_a : ∀ (j : Fin (k + 4)), makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq) j.castSucc zero_fin := by
+          intro j
+          -- Reusing old have statement that is no longer in scope.
+          have know_all_but_last : ∀ (i : Fin (k + 4)), ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
+            intro i j
+            rw [addAgent_replacable]
+            simp [addAgent]
+            aesop
+          have weaker : moreGossip (makeCalls (addAgent (initialState (k + 4))) (expandCalls seq)) (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq)) := by
+            apply makeCalls_increases_gossip
+            apply makeCall_makes_gossip
+          apply weaker
+          exact know_all_but_last j zero_fin
+
+        have new_agent_learns_a : makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq) succ_fin zero_fin := by
+          have weaker : moreGossip (makeCall (addAgent (initialState (k + 4))) initial_call) (makeCalls (makeCall (addAgent (initialState (k + 4))) initial_call) (expandCalls seq)) := by
+            apply calls_increase_gossip
+
+          apply weaker
+          simp_all only [makeCall, addAgent, initialState]
+          rw [if_neg]
+          · simp [succ_fin, zero_fin]
+            right
+            simp [Fin.lastCases, Fin.reverseInduction]
+            aesop
+          · have less : 1 < Fin.last (k + 4) := by
+              apply Fin.one_lt_last
+            aesop
+
+        intro j
+        cases j using Fin.lastCases
+        case last => exact new_agent_learns_a
+        case cast foo j =>
+          rw [makeCalls_cons] at h''
+          exact old_agents_learn_a j
+      case fin_succ_knows_own =>
+        exact fin_succ_knows_own
+
+    -- Type mismatch, need to fix.
+    cases i using Fin.lastCases
+    case last => exfalso; tauto
+    case cast foo i =>
+      exact all_know_new_secret
+
+
+  -- Putting them together in the right format.
+  have final : ∀ (j : Fin (Nat.succ (k + 4))), temp_state i j := by
+    intro j
+    -- all old agents know the new agent's secret
+    have final_secret : temp_state (i.castSucc) succ_fin := by
+      aesop
+
+    -- all old agents know all old secrets in the new state
+    have other_secrets : ∀ (q : Fin (k + 4)), temp_state i (q.castSucc) := by
+      aesop
+
+    have other_secrets_rewritten : ∀ (q : Fin (Nat.succ (k + 4))), temp_state i q := by
+      intro q
+      cases q using Fin.lastCases <;> cases i using Fin.lastCases
+      all_goals simp_all
+
+    simp [succ_fin] at final_secret
+    aesop
+  aesop
+
   simp [new_state, isExpert]
-
-  -- The goal is true for temp_state, which is weaker than new_state, so it's true for new_state.
-  have subgoal_2 : moreGossip temp_state new_state := by
-    simp [temp_state, new_state, calls_without_final_call, expandedSeq]
-    apply makeCall_makes_gossip
-
-  intro i a j
-  simp_all only [ne_eq, new_state]
-  apply subgoal_2
-  simp_all only [not_false_eq_true]
-
-  -- Using the final call, we can show that the new agent also becomes an expert
-  have h_new4 : isExpert new_state succ_fin := by
-    have h : isExpert temp_state zero_fin := by
-      unfold isExpert
-      intro j
-      simp_all only [temp_state, calls_without_final_call]
-      simp_all only [List.singleton_append]
-      apply milestone_3
-
-    have h' : new_state = makeCall temp_state initial_call := by
-      rw [single_calls]
-      simp [temp_state, calls_without_final_call, expandedSeq]
-      repeat rw [makeCalls_cons]
-      rw [makeCalls_snoc, addAgent_equals_succ]
-    rw [h']
-    apply expert_makes_expert
-    exact h
 
 -- Main lemma for the induction step
 lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 4))):
@@ -1138,11 +1120,11 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
         -- All agents get to learn the new agent's secret.
         have all_know_new_secret : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) i.castSucc succ_fin := by
           have fin_succ_knows_own : makeCall (addAgent (initialState (k + 4))) initial_call succ_fin succ_fin := by
-            simp [makeCall, addAgent]
+            simp only [makeCall, addAgent, beq_self_eq_true, or_self, ↓reduceIte]
             split
             · have less : 1 < Fin.last (k + 4) := by
                 apply Fin.one_lt_last
-              aesop
+              aesop?
             · simp [Fin.lastCases, Fin.reverseInduction]
 
           apply two_secrets_succ (makeCall (addAgent (initialState (k + 4))) initial_call) zero_fin succ_fin (expandCalls seq) (by aesop) (by unfold_let succ_fin; rfl)
@@ -1154,13 +1136,13 @@ lemma inductive_case (k : Nat) (h: Nat.succ k + 4 ≥ 4) (seq : List (Call (k + 
                 aesop
               case cast _ i =>
                 simp [initial_call, makeCall, addAgent, initialState]
-                aesop
+                aesop?
             · cases i using Fin.lastCases
               case last =>
-                aesop
+                aesop?
               case cast _ i =>
                 simp [initial_call, makeCall, addAgent, initialState]
-                aesop
+                aesop?
           case a_knows_b =>
             simp [makeCall]
             right
