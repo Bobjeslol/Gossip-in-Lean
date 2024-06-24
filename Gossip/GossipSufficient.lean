@@ -309,7 +309,7 @@ lemma addAgentEqualsSucc {n : ℕ} :
 
 
 -- addAgent (initialState n) is replacable with initialState (n + 1) in the following lemma.
-lemma makeCallsAddAgentInitialState {n : Nat} (initial_call : Call (n + 1)) (expandedSeq : List (Call (n + 1))) :
+lemma singleMakeCalls {n : Nat} (initial_call : Call (n + 1)) (expandedSeq : List (Call (n + 1))) :
   makeCall (makeCalls (makeCall (addAgent (initialState n)) initial_call) expandedSeq) initial_call =
   makeCalls (initialState (n + 1)) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
   rw [← makeCalls_cons, addAgentEqualsSucc, makeCalls_snoc]
@@ -407,7 +407,8 @@ lemma addAgentMakeCallsCommute {n : Nat} (σ : List (Call n)) (someState : Gossi
     simp_all [expandCalls, expandCall, addAgent, makeCalls]
     rw [← IH]
     clear IH
-    have equiv : makeCall (addAgent someState) (Fin.castSucc a, Fin.castSucc b) = addAgent (makeCall someState (a, b)) := addAgentMakeCallCommute (a,b) _
+    have equiv : makeCall (addAgent someState) (Fin.castSucc a, Fin.castSucc b) = addAgent (makeCall someState (a, b)) :=
+      addAgentMakeCallCommute (a,b) _
     rw [equiv]
 
 
@@ -622,7 +623,7 @@ lemma lemma_1 {k : Nat} (seq : List (Call (k + 4))) (IH : allExpert (makeCalls (
 
   have single_calls : new_state = makeCalls (initialState (Nat.succ (k + 4))) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
     simp [new_state]
-    apply makeCallsAddAgentInitialState
+    apply singleMakeCalls
 
   have h : ∀ i, i ≠ succ_fin → makeCalls (addAgent (initialState (k + 4))) expandedSeq zero_fin i := by
     simp_all only [expandedSeq, isExpert]
@@ -709,7 +710,7 @@ lemma inductiveCase (k : Nat) (seq : List (Call (k + 4))):
   -- We can rewrite new_state so it contains a single call sequence.
   have single_calls : new_state = makeCalls (initialState (Nat.succ (k + 4))) ([initial_call] ++ expandedSeq ++ [initial_call]) := by
     simp [new_state]
-    apply makeCallsAddAgentInitialState
+    apply singleMakeCalls
 
   -- All but the last agent learn the secret of the new agent using all but the final call.
   have milestone_1_test : ∀ i, i ≠ succ_fin → temp_state zero_fin i := by
