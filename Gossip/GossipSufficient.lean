@@ -185,7 +185,7 @@ lemma makeCallsIncreasesGossip (s1 s2 : GossipState n) (cs : List (Call n)) :
     case cons head tail ih =>
       rw [makeCalls_cons, makeCalls_cons]
       have h_call : moreGossip (makeCall s1 head) (makeCall s2 head) :=
-        makeCall_increases_gossip s1 s2 head h
+        makeCall_increases_gossip s1 s2 head h -- uses the previous lemma for a single call.
       exact ih (makeCall s1 head) (makeCall s2 head) h_call
 
 
@@ -740,7 +740,7 @@ lemma inductiveCase (k : Nat) (seq : List (Call (k + 4))):
       rw [addAgentExpertOld] at h'
 
       -- All old agents know all old secrets in temp_state.
-      have subsubgoal1 : ∀ (j : Fin (k + 4)), (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i (Fin.castSucc j) := by
+      have oldLearnOld : ∀ (j : Fin (k + 4)), (makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq)) i (Fin.castSucc j) := by
 
         -- Its true for this state.
         have weaker_state : ∀ (j : Fin (k + 4)), makeCalls (addAgent (initialState (k + 4))) (expandCalls seq) i.castSucc j.castSucc := by
@@ -770,7 +770,7 @@ lemma inductiveCase (k : Nat) (seq : List (Call (k + 4))):
         aesop
 
       -- All i learn the secret of the new agent as well.
-      have subsubgoal2 : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) (i.castSucc) succ_fin := by
+      have oldLearnNew : makeCalls (addAgent (initialState (k + 4))) (initial_call :: expandCalls seq) (i.castSucc) succ_fin := by
         -- prepare for the lemma.
         have agent_0_knows_both : temp_state zero_fin succ_fin ∧ temp_state zero_fin zero_fin := by
           constructor
@@ -851,7 +851,7 @@ lemma inductiveCase (k : Nat) (seq : List (Call (k + 4))):
             cases j using Fin.lastCases
             case last => exact new_agent_learns_a
             case cast j =>
-              rw [makeCalls_cons] at subsubgoal1
+              rw [makeCalls_cons] at oldLearnOld
               exact old_agents_learn_a j
           case fin_succ_knows_own =>
             exact fin_succ_knows_own
