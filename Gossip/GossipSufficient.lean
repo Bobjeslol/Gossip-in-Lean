@@ -408,7 +408,7 @@ lemma addAgentMakeCallsCommute {n : Nat} (σ : List (Call n)) (someState : Gossi
     rw [← IH]
     clear IH
     have equiv : makeCall (addAgent someState) (Fin.castSucc a, Fin.castSucc b) = addAgent (makeCall someState (a, b)) :=
-      addAgentMakeCallCommute (a,b) _
+      addAgentMakeCallCommute (a,b) _ -- Uses the lemma for a single call.
     rw [equiv]
 
 
