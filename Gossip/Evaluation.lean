@@ -1,9 +1,7 @@
 -- Evaluation.lean
 --
 -- Author:      Timo Doherty
--- Student-ID:  11868910
 -- Course:      Graduation Project Informatica
--- Date:        2024-06-23
 --
 -- Description:
 -- - This file contains the evaluation of the gossip representation contained in Gossip/GossipSufficient.lean.
@@ -21,20 +19,20 @@ lemma makeCall_shares_secrets : (makeCall (initialState n) (a, b)) a b := by
 
 
 -- Old agents only know the secrets of old agents iff they did before.
-lemma addAgent_old_old {s : GossipState n} {i j : Fin n} :
+lemma addAgentOldOld {s : GossipState n} {i j : Fin n} :
     addAgent s i.castSucc j.castSucc ↔ s i j := by
     simp [addAgent]
 
 
 -- Old agents don't know the secrets of the new agents.
-lemma addAgent_old_new {s : GossipState n} {i : Fin n} :
+lemma addAgentOldNew {s : GossipState n} {i : Fin n} :
     ¬ addAgent s i.castSucc (Fin.last n) := by
     simp only [addAgent, beq_self_eq_true, Fin.lastCases_last, Fin.lastCases_castSucc,
       not_false_eq_true]
 
 
 -- New agents don't know the secrets of the old agents.
-lemma addAgent_new_old {s : GossipState n} {i : Fin n} :
+lemma addAgentNewOld {s : GossipState n} {i : Fin n} :
     ¬ addAgent s (Fin.last n) i.castSucc := by
     simp [addAgent]
     cases i
@@ -45,13 +43,13 @@ lemma addAgent_new_old {s : GossipState n} {i : Fin n} :
 
 
 -- New agents know their own secret.
-lemma addAgent_new_new {s : GossipState n} :
+lemma addAgentNewNew {s : GossipState n} :
     addAgent s (Fin.last n) (Fin.last n) := by
     simp [addAgent]
 
 
 -- The gossip after some call sequence will still be available if we do another call first.
-lemma knowledgePersistsCallBefore (n : ℕ) (σ : List (Call n)) (i j k l: Fin n) :
+lemma persistsCallBefore (n : ℕ) (σ : List (Call n)) (i j k l: Fin n) :
   (makeCalls (initialState n) σ) i j → (makeCalls (makeCall (initialState n) (k, l)) σ) i j := by
   intro h
   apply makeCalls_increases_gossip
@@ -60,7 +58,7 @@ lemma knowledgePersistsCallBefore (n : ℕ) (σ : List (Call n)) (i j k l: Fin n
 
 
 -- The gossip in some state is still available after a call.
-lemma knowledgePersistsCallAfter (n : ℕ) (i j k l: Fin n) (s : GossipState n) :
+lemma persistsCallAfter (n : ℕ) (i j k l: Fin n) (s : GossipState n) :
   s i j → (makeCall s (k, l)) i j := by
   simp [makeCall]
   intro h
@@ -80,12 +78,12 @@ lemma knowledgePersistsCallAfter (n : ℕ) (i j k l: Fin n) (s : GossipState n) 
 
 
 -- Initially agents know their own secrets.
-lemma initially_knows_own_secret (n : ℕ) (i : Fin n) : initialState n i i := by
+lemma initiallyOwnSecret (n : ℕ) (i : Fin n) : initialState n i i := by
   simp [initialState]
 
 
 -- Initially agents dont know each other's secrets.
-lemma intially_no_secrets (n : ℕ) (i j : Fin n) : i ≠ j → ¬ (initialState n) i j := by
+lemma intiallyNoSecrets (n : ℕ) (i j : Fin n) : i ≠ j → ¬ (initialState n) i j := by
   simp [initialState]
 
 

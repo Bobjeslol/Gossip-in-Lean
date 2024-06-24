@@ -2,7 +2,7 @@ import Lake
 open Lake DSL
 
 package «Gossip» {
-  -- add any package configuration options here
+
 }
 
 require mathlib from git

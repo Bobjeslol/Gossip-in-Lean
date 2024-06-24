@@ -1,13 +1,12 @@
 -- GossipNecessary.lean
 --
 -- Author:      Timo Doherty
--- Student-ID:  11868910
 -- Course:      Graduation Project Informatica
--- Date:        2024-06-20
 --
 -- Description:
 -- - This file implements the groundwork for the proof that 2n-4 calls are required
--- for all agents to become experts. The proof is not yet complete, due to a lack of time.
+-- for all agents to become experts. The structure of this proof should follow
+-- that of Baker and Shostak's approach `Gossips and telephones`.
 
 
 import Gossip.GossipSufficient
@@ -22,16 +21,11 @@ lemma noSelfHearing {n : Nat} : ∀ (σ : List (Call n)), σ.length ≤ 2 * n - 
   → allExpert (makeCalls (initialState n) σ)
   → ∀ i : Fin σ.length,
   ¬ ((makeCalls (initialState n) (σ.take (i - 1))) σ[i].fst σ[i].snd
-  ∨ (makeCalls (initialState n) (σ.take (i - 1))) σ[i].snd σ[i].fst) := by
-  intro σ
-  intro h1
-  intro h2
-
+  ∨ (makeCalls (initialState n) (σ.take (i - 1))) σ[i].snd σ[i].fst) :=
   sorry
 
 
 -- All sequences that make all n, with n ≥ 4 agents experts, have length 2n-4 or higher.
 theorem necessity {n : Nat} : (n ≥ 4) →
   ∀ (σ : List (Call n)), allExpert (makeCalls (initialState n) σ)
-  → σ.length ≥ 2*n - 4 := by
-  sorry
+  → σ.length ≥ 2*n - 4 := sorry
